@@ -6,12 +6,12 @@ import java.io.Serial;
 import java.io.Serializable;
 
 @Data
-public class AppAddRequest implements Serializable {
+public class AppDeployRequest implements Serializable {
 
     /**
-     * 应用初始化的 prompt
+     * 应用 id
      */
-    private String initPrompt;
+    private Long appId;
 
     @Serial
     private static final long serialVersionUID = 1L;

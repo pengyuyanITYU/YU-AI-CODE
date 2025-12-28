@@ -4,8 +4,8 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
 import com.yu.yuaicodemother.model.dto.user.UserQueryRequest;
 import com.yu.yuaicodemother.model.entity.User;
-import com.yu.yuaicodemother.model.vo.LoginUserVO;
-import com.yu.yuaicodemother.model.vo.UserVO;
+import com.yu.yuaicodemother.model.vo.user.LoginUserVO;
+import com.yu.yuaicodemother.model.vo.user.UserVO;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;

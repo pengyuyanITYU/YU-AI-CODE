@@ -1,4 +1,4 @@
-package com.yu.yuaicodemother.model.vo;
+package com.yu.yuaicodemother.model.vo.user;
 
 import lombok.Data;
 
