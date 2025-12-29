@@ -2,7 +2,9 @@ package com.yu.yuaicodemother.ai;
 
 import com.yu.yuaicodemother.ai.model.HtmlCodeResult;
 import com.yu.yuaicodemother.ai.model.MultiFileCodeResult;
+import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.UserMessage;
 import reactor.core.publisher.Flux;
 
 public interface AiCodeGeneratorService {
@@ -15,6 +17,16 @@ public interface AiCodeGeneratorService {
      * */
     @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
     HtmlCodeResult generateHTMLCode(String userMessage);
+
+    /**
+     * 生成HTML代码
+     *
+     * @param userMessage 用户提示词
+     * @return AI输出结果
+     * */
+    @Deprecated
+    @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
+    HtmlCodeResult generateHTMLCode(@MemoryId int memoryId, @UserMessage String userMessage);
 
     /**
      *  生成多文件代码
