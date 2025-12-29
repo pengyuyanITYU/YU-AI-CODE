@@ -19,7 +19,7 @@ public interface AiCodeGeneratorService {
     HtmlCodeResult generateHTMLCode(String userMessage);
 
     /**
-     * 生成HTML代码
+     * 生成HTML代码   (外部)
      *
      * @param userMessage 用户提示词
      * @return AI输出结果
