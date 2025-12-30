@@ -1,5 +1,6 @@
 package com.yu.yuaicodemother.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -15,10 +16,14 @@ import com.yu.yuaicodemother.model.entity.User;
 import com.yu.yuaicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.yu.yuaicodemother.service.AppService;
 import com.yu.yuaicodemother.service.ChatHistoryService;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
-
+import java.util.List;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
@@ -28,12 +33,59 @@ import java.time.LocalDateTime;
  * @author 鱼🐟
  */
 @Service
+@Slf4j
 public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatHistory>  implements ChatHistoryService{
 
 
     @Lazy
     @Resource
     private AppService appService;
+
+    @Override
+    public int loadChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int maxCount) {
+        try {
+            // 直接构造查询条件，起始点为 1 而不是 0，用于排除最新的用户消息
+            QueryWrapper queryWrapper = QueryWrapper.create()
+                    .eq(ChatHistory::getAppId, appId)
+                    .orderBy(ChatHistory::getCreateTime, false)
+                    .limit(1, maxCount);
+            List<ChatHistory> historyList = this.list(queryWrapper);
+            if (CollUtil.isEmpty(historyList)) {
+                return 0;
+            }
+            // 反转列表，确保按时间正序（老的在前，新的在后）
+            historyList = historyList.reversed();
+            // 按时间顺序添加到记忆中
+            int loadedCount = 0;
+            // 先清理历史缓存，防止重复加载
+            chatMemory.clear();
+            for (ChatHistory history : historyList) {
+                if (ChatHistoryMessageTypeEnum.USER.getValue().equals(history.getMessageType())) {
+/*                             UserMessage.from(...)意思： 把一段文本标记为 “用户说的话”。
+                    作用： 大模型需要知道这句话是谁说的。如果是用户说的，模型会把它当作“指令”或“问题”去处理。
+*/
+                    chatMemory.add(UserMessage.from(history.getMessage()));
+                    loadedCount++;
+                } else if (ChatHistoryMessageTypeEnum.AI.getValue().equals(history.getMessageType())) {
+/*
+                  AiMessage.from(...) 把一段文本标记为 “AI 说的话”。
+                 作用： 这是模型自己之前生成的回答。模型看到这个，就知道“哦，这是我之前回答过的内容”，
+                 从而保持对话的连贯性（比如你接着问“它是什么”，AI 知道“它”指代上文它自己提到的东西）。
+*/
+                    chatMemory.add(AiMessage.from(history.getMessage()));
+                    loadedCount++;
+                }
+
+            }
+            log.info("成功为 appId: {} 加载了 {} 条历史对话", appId, loadedCount);
+            return loadedCount;
+        } catch (Exception e) {
+            log.error("加载历史对话失败，appId: {}, error: {}", appId, e.getMessage(), e);
+            // 加载失败不影响系统运行，只是没有历史上下文
+            return 0;
+        }
+    }
+
 
     @Override
     public Page<ChatHistory> listAppChatHistoryByPage(Long appId, int pageSize,

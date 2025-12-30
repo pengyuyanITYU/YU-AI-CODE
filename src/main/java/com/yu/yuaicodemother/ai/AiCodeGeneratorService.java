@@ -15,11 +15,12 @@ public interface AiCodeGeneratorService {
      * @param userMessage 用户提示词
      * @return AI输出结果
      * */
+    @Deprecated
     @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
     HtmlCodeResult generateHTMLCode(String userMessage);
 
     /**
-     * 生成HTML代码   (外部)
+     * 生成HTML代码   (外部) memorId用法
      *
      * @param userMessage 用户提示词
      * @return AI输出结果
@@ -34,8 +35,19 @@ public interface AiCodeGeneratorService {
      * @param userMessage 用户提示词
      * @return AI输出结果
      * */
+    @Deprecated
     @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
     MultiFileCodeResult generateMultiFileCode(String userMessage);
+
+
+    /**
+     *  生成Vue工程代码
+     *
+     * @param userMessage 用户提示词
+     * @return AI输出结果
+     * */
+    @SystemMessage(fromResource = "prompt/codegen-vue-project-system-prompt.txt")
+    MultiFileCodeResult generateVueProjectCode(String userMessage);
 
 
     /**

@@ -16,10 +16,19 @@ spring:
       port: 6379
       password:
       ttl: 3600
+  # session 配置
+  session:
+    store-type: redis
+    # session 30 天过期
+    timeout: 2592000
 server:
   port: 8123
   servlet:
     context-path: /api
+    # cookie 30 天过期
+    session:
+      cookie:
+          max-age: 2592000
 
 # springdoc-openapi
 springdoc:
@@ -51,6 +60,15 @@ langchain4j:
       max-tokens: 8192
       log-requests: true
       log-responses: true
+      temperature: 0.7
+    reasoning-chat-model:
+      base-url: https://api.deepseek.com
+      api-key: <Your API Key>
+      model-name: deepseek-chat
+      max-tokens: 8192
+      log-requests: true
+      log-responses: true
+
 
 
 
