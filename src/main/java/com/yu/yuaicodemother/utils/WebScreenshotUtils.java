@@ -121,6 +121,7 @@ public class WebScreenshotUtils {
                             .equals("complete")
             );
             // 额外等待一段时间，确保动态内容加载完成
+//              TODO 等待时间可自行调整
             Thread.sleep(2000);
             log.info("页面加载完成");
         } catch (Exception e) {

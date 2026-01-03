@@ -122,7 +122,7 @@ public class JsonMessageStreamHandler {
                     // 忽略空消息
                     return "";
                 }
-                return "\n\n[AI正在思考] " + partialThinking.text();
+                return "\n\n[AI正在思考🐟] " + partialThinking.text();
             }
 
             default -> {

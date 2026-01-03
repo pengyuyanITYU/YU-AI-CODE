@@ -1,6 +1,5 @@
 package com.yu.yuaicodemother.config;
 
-import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -20,8 +19,8 @@ public class RedisChatMemoryStoreConfig {
     private long ttl;
 
     @Bean
-    public RedisChatMemoryStore redisChatMemoryStore() {
-        return RedisChatMemoryStore.builder()
+    public dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore redisChatMemoryStore() {
+        return dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore.builder()
                 .host(host)
                 .port(port)
                 .password(password)

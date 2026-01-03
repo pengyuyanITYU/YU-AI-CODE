@@ -2,6 +2,7 @@ package com.yu.yuaicodemother.service;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import com.yu.yuaicodemother.model.dto.app.AppAddRequest;
 import com.yu.yuaicodemother.model.dto.app.AppQueryRequest;
 import com.yu.yuaicodemother.model.entity.App;
 import com.yu.yuaicodemother.model.entity.User;
@@ -32,4 +33,7 @@ public interface AppService extends IService<App> {
     boolean removeById(Serializable id);
 
     void generateAppScreenshotAsync(Long appId, String appUrl);
+
+    Long createApp(AppAddRequest appAddRequest, User loginUser);
+
 }
