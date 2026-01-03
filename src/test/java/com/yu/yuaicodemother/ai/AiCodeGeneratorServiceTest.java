@@ -2,10 +2,12 @@ package com.yu.yuaicodemother.ai;
 
 import com.yu.yuaicodemother.ai.model.HtmlCodeResult;
 import com.yu.yuaicodemother.ai.model.MultiFileCodeResult;
+import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import reactor.core.publisher.Flux;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -36,5 +38,8 @@ class AiCodeGeneratorServiceTest {
         result = aiCodeGeneratorService.generateHTMLCode(2, "不要生成网站，告诉我你刚刚做了什么？");
         Assertions.assertNotNull(result);
     }
+
+
+
 
 }

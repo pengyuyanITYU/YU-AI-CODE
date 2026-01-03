@@ -4,6 +4,7 @@ import com.yu.yuaicodemother.ai.model.HtmlCodeResult;
 import com.yu.yuaicodemother.ai.model.MultiFileCodeResult;
 import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;
+import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
 import reactor.core.publisher.Flux;
 
@@ -47,7 +48,7 @@ public interface AiCodeGeneratorService {
      * @return AI输出结果
      * */
     @SystemMessage(fromResource = "prompt/codegen-vue-project-system-prompt.txt")
-    MultiFileCodeResult generateVueProjectCode(String userMessage);
+    TokenStream generateVueProjectCode(@MemoryId long appId , @UserMessage String userMessage);
 
 
     /**

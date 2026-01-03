@@ -30,4 +30,6 @@ public interface AppService extends IService<App> {
     String deployApp(Long appId, User loginUser);
 
     boolean removeById(Serializable id);
+
+    void generateAppScreenshotAsync(Long appId, String appUrl);
 }
