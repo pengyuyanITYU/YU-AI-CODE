@@ -8,6 +8,7 @@ import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.yu.yuaicodemother.ai.AiCodeGenTypeRoutingService;
+import com.yu.yuaicodemother.ai.model.CodeGenTypeRoutingResult;
 import com.yu.yuaicodemother.common.BaseResponse;
 import com.yu.yuaicodemother.common.ResultUtils;
 import com.yu.yuaicodemother.constant.AppConstant;
@@ -90,11 +91,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         // 应用名称暂时为 initPrompt 前 12 位
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
         // 使用 AI 智能选择代码生成类型
-        CodeGenTypeEnum selectedCodeGenType = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
+        CodeGenTypeRoutingResult result = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
+        CodeGenTypeEnum selectedCodeGenType = result.getType();
         app.setCodeGenType(selectedCodeGenType.getValue());
         // 插入数据库
-        boolean result = this.save(app);
-        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        boolean resultSave = this.save(app);
+        ThrowUtils.throwIf(!resultSave, ErrorCode.OPERATION_ERROR);
         log.info("应用创建成功，ID: {}, 类型: {}", app.getId(), selectedCodeGenType.getValue());
         return app.getId();
     }

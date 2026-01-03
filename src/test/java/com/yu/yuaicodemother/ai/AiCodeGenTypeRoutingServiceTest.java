@@ -1,5 +1,6 @@
 package com.yu.yuaicodemother.ai;
 
+import com.yu.yuaicodemother.ai.model.CodeGenTypeRoutingResult;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -16,13 +17,13 @@ public class AiCodeGenTypeRoutingServiceTest {
     @Test
     public void testRouteCodeGenType() {
         String userPrompt = "做一个简单的个人介绍页面";
-        CodeGenTypeEnum result = aiCodeGenTypeRoutingService.routeCodeGenType(userPrompt);
-        log.info("用户需求: {} -> {}", userPrompt, result.getValue());
+        CodeGenTypeRoutingResult result = aiCodeGenTypeRoutingService.routeCodeGenType(userPrompt);
+        log.info("用户需求: {} -> {}", userPrompt, result.getType().getValue());
         userPrompt = "做一个公司官网，需要首页、关于我们、联系我们三个页面";
         result = aiCodeGenTypeRoutingService.routeCodeGenType(userPrompt);
-        log.info("用户需求: {} -> {}", userPrompt, result.getValue());
+        log.info("用户需求: {} -> {}", userPrompt, result.getType().getValue());
         userPrompt = "做一个电商管理系统，包含用户管理、商品管理、订单管理，需要路由和状态管理";
         result = aiCodeGenTypeRoutingService.routeCodeGenType(userPrompt);
-        log.info("用户需求: {} -> {}", userPrompt, result.getValue());
+        log.info("用户需求: {} -> {}", userPrompt, result.getType().getValue());
     }
 }

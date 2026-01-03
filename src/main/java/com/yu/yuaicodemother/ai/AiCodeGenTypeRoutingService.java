@@ -1,5 +1,6 @@
 package com.yu.yuaicodemother.ai;
 
+import com.yu.yuaicodemother.ai.model.CodeGenTypeRoutingResult;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
@@ -19,5 +20,5 @@ public interface AiCodeGenTypeRoutingService {
      * @return 推荐的代码生成类型
      */
     @SystemMessage(fromResource = "prompt/codegen-routing-system-prompt.txt")
-    CodeGenTypeEnum routeCodeGenType(String userPrompt);
+    CodeGenTypeRoutingResult routeCodeGenType(String userPrompt);
 }
