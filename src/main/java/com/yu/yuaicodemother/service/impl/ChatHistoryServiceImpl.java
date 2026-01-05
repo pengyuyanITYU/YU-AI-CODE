@@ -75,7 +75,6 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
                     chatMemory.add(AiMessage.from(history.getMessage()));
                     loadedCount++;
                 }
-
             }
             log.info("成功为 appId: {} 加载了 {} 条历史对话", appId, loadedCount);
             return loadedCount;
@@ -128,7 +127,6 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         return this.save(chatHistory);
     }
 
-
     @Override
     public boolean deleteByAppId(Long appId) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
@@ -136,6 +134,8 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
                 .eq("appId", appId);
         return this.remove(queryWrapper);
     }
+
+
     /**
      * 获取查询包装类
      *
@@ -177,7 +177,5 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         }
         return queryWrapper;
     }
-
-
 
 }

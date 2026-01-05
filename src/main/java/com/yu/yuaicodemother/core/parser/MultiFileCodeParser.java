@@ -42,7 +42,6 @@ public class MultiFileCodeParser implements CodeParser<MultiFileCodeResult> {
 
     /**
      * 根据正则模式提取代码 (元)
-     *
      * @param content 原始内容
      * @param pattern 正则模式
      * @return 提取的代码

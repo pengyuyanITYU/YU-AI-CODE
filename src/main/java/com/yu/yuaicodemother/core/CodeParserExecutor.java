@@ -10,7 +10,7 @@ import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
  * 代码解析执行器
  * 根据代码生成类型执行相应的解析逻辑
  *
- * @author yu🐟
+ * @author 鱼🐟
  */
 @Deprecated
 public class CodeParserExecutor {

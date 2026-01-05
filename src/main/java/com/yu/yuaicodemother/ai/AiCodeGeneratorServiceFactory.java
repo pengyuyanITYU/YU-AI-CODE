@@ -2,12 +2,11 @@ package com.yu.yuaicodemother.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.yu.yuaicodemother.config.RedisChatMemoryStoreConfig;
+import com.yu.yuaicodemother.ai.tools.*;
 import com.yu.yuaicodemother.exception.BusinessException;
 import com.yu.yuaicodemother.exception.ErrorCode;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
 import com.yu.yuaicodemother.service.ChatHistoryService;
-import com.yu.yuaicodemother.tools.FileWriteTool;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
@@ -40,6 +39,9 @@ public class AiCodeGeneratorServiceFactory {
 
     @Resource
     private ChatHistoryService chatHistoryService;
+
+    @Resource
+    private ToolManager toolManager;
 
 
 
@@ -88,11 +90,12 @@ public class AiCodeGeneratorServiceFactory {
             case VUE_PROJECT -> AiServices.builder(AiCodeGeneratorService.class)
                     .streamingChatModel(reasoningStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
-                    .tools(new FileWriteTool())
+                    .tools(toolManager.getAllTools())
                     .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                             toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
                     ))
                     .build();
+
             // HTML 和多文件生成使用默认模型
             case HTML, MULTI_FILE -> AiServices.builder(AiCodeGeneratorService.class)
                     .chatModel(chatModel)
@@ -107,8 +110,6 @@ public class AiCodeGeneratorServiceFactory {
 
     /**
      * 兼容老版本
-     *
-     *
      * */
     @Deprecated
     @Bean
@@ -120,8 +121,6 @@ public class AiCodeGeneratorServiceFactory {
     private String buildCacheKey(long appId, CodeGenTypeEnum codeGenType){
         return appId + "_" + codeGenType.getValue();
     }
-
-
 
 
 }

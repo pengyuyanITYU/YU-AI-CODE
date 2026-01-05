@@ -89,7 +89,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         BeanUtil.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
         // 应用名称暂时为 initPrompt 前 12 位
-        app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
+        app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 15)));
         // 使用 AI 智能选择代码生成类型
         CodeGenTypeRoutingResult result = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
         CodeGenTypeEnum selectedCodeGenType = result.getType();
