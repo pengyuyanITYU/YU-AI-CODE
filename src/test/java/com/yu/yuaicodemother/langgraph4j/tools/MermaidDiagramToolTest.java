@@ -23,7 +23,7 @@ class MermaidDiagramToolTest {
                     Start([开始]) --> Input[输入数据]
                     Input --> Process[处理数据]
                     Process --> Decision{是否有效?}
-                    Decision -->|是| Output[输出结果]npm install -g @mermaid-js/mermaid-cli
+                    Decision -->|是| Output[输出结果]
                 
                     Decision -->|否| Error[错误处理]
                     Output --> End([结束])

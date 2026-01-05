@@ -1,6 +1,7 @@
 package com.yu.yuaicodemother.manager;
 
 import com.qcloud.cos.COSClient;
+import com.qcloud.cos.model.ObjectMetadata;
 import com.qcloud.cos.model.PutObjectRequest;
 import com.qcloud.cos.model.PutObjectResult;
 import com.yu.yuaicodemother.config.CosClientConfig;
@@ -8,7 +9,12 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.InputStream;
+import java.net.URL;
+import java.net.URLConnection;
 
 /**
  * COS对象存储管理器
@@ -24,6 +30,64 @@ public class CosManager {
 
     @Resource
     private COSClient cosClient;
+
+
+    /**
+     * 根据 URL 下载文件并上传到 COS
+     *
+     * @param url 源文件的网络URL
+     * @param key COS对象键（存储路径，如 images/2024/1.png）
+     * @return 文件的访问URL，失败抛出异常
+     */
+    public String uploadFileByUrl(String url, String key) {
+        try {
+            // 1. 建立连接
+            URL sourceUrl = new URL(url);
+            URLConnection connection = sourceUrl.openConnection();
+            // 设置超时时间，防止网络卡顿导致线程阻塞
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(10000);
+
+            // 2. 读取流
+            try (InputStream inputStream = connection.getInputStream()) {
+                // 为了获取准确的文件大小（COS上传流必须指定大小），先读入内存
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                byte[] buffer = new byte[1024];
+                int len;
+                while ((len = inputStream.read(buffer)) > -1) {
+                    baos.write(buffer, 0, len);
+                }
+                baos.flush();
+
+                // 转为输入流
+                byte[] fileBytes = baos.toByteArray();
+                ByteArrayInputStream uploadStream = new ByteArrayInputStream(fileBytes);
+
+                // 3. 设置元数据
+                ObjectMetadata metadata = new ObjectMetadata();
+                metadata.setContentLength(fileBytes.length);
+                // 自动识别 Content-Type (如 image/png)，这对浏览器预览很重要
+                String contentType = connection.getContentType();
+                if (contentType != null) {
+                    metadata.setContentType(contentType);
+                }
+
+                // 4. 执行上传
+                PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key, uploadStream, metadata);
+                cosClient.putObject(putObjectRequest);
+
+                // 5. 构建并返回访问URL
+                // 注意：这里假设 cosClientConfig.getHost() 已经包含了末尾的斜杠，或者 key 开头有斜杠
+                // 如果没有，建议优化为: cosClientConfig.getHost().replaceAll("/$", "") + "/" + key.replaceAll("^/", "")
+                String resultUrl = String.format("%s%s", cosClientConfig.getHost(), key);
+                log.info("网络文件上传COS成功: Source={} -> Target={}", url, resultUrl);
+                return resultUrl;
+            }
+        } catch (Exception e) {
+            log.error("网络文件上传COS失败, url: {}, key: {}", url, key, e);
+            throw new RuntimeException("上传网络文件失败: " + e.getMessage());
+        }
+    }
 
     /**
      * 上传对象

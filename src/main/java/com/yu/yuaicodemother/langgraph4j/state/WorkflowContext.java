@@ -1,15 +1,17 @@
 package com.yu.yuaicodemother.langgraph4j.state;
 
 import com.yu.yuaicodemother.langgraph4j.model.ImageResource;
+import com.yu.yuaicodemother.langgraph4j.model.QualityResult;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.bsc.langgraph4j.prebuilt.MessagesState;
-import java.util.List;
+
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -21,6 +23,9 @@ import java.util.Map;
 @AllArgsConstructor
 public class WorkflowContext implements Serializable {
 
+    @Serial
+    private static final long serialVersionUID = 1L;
+
     /**
      * WorkflowContext 在 MessagesState 中的存储key
      */
@@ -30,6 +35,12 @@ public class WorkflowContext implements Serializable {
      * 当前执行步骤
      */
     private String currentStep;
+
+    /**
+     * 质量检查结果
+     */
+    private QualityResult qualityResult;
+
 
     /**
      * 用户原始输入的提示词
@@ -71,8 +82,6 @@ public class WorkflowContext implements Serializable {
      */
     private String errorMessage;
 
-    @Serial
-    private static final long serialVersionUID = 1L;
 
     // ========== 上下文操作方法 ==========
 

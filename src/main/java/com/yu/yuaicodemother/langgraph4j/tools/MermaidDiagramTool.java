@@ -65,19 +65,60 @@ public class MermaidDiagramTool {
         FileUtil.writeUtf8String(mermaidCode, tempInputFile);
         // 创建临时输出文件
         File tempOutputFile = FileUtil.createTempFile("mermaid_output_", ".svg", true);
-        // 根据操作系统选择命令
-        String command = SystemUtil.getOsInfo().isWindows() ? "mmdc.cmd" : "mmdc";
-        // 构建命令
-        String cmdLine = String.format("%s -i %s -o %s -b transparent",
-                command,
-                tempInputFile.getAbsolutePath(),
-                tempOutputFile.getAbsolutePath()
-        );
-        // 执行命令
-        RuntimeUtil.execForStr(cmdLine);
+
+        // 构建命令参数列表
+        List<String> commands = new ArrayList<>();
+        if (SystemUtil.getOsInfo().isWindows()) {
+            commands.add("mmdc.cmd");
+        } else {
+            commands.add("mmdc");
+        }
+        commands.add("-i");
+        commands.add(tempInputFile.getAbsolutePath());
+        commands.add("-o");
+        commands.add(tempOutputFile.getAbsolutePath());
+        commands.add("-b");
+        commands.add("transparent");
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder(commands);
+            
+            // 尝试自动寻找本地 Chrome 并设置环境变量，解决 Puppeteer 找不到浏览器的问题
+            if (SystemUtil.getOsInfo().isWindows()) {
+                String[] chromePaths = {
+                    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+                    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+                };
+                for (String path : chromePaths) {
+                    if (FileUtil.exist(path)) {
+                        pb.environment().put("PUPPETEER_EXECUTABLE_PATH", path);
+                        log.info("检测到本地 Chrome，已设置 PUPPETEER_EXECUTABLE_PATH: {}", path);
+                        break;
+                    }
+                }
+            }
+
+            log.info("Executing Mermaid command: {}", String.join(" ", commands));
+            Process process = pb.start();
+            
+            // 读取标准输出和错误输出
+            String output = cn.hutool.core.io.IoUtil.read(process.getInputStream(), java.nio.charset.StandardCharsets.UTF_8);
+            String error = cn.hutool.core.io.IoUtil.read(process.getErrorStream(), java.nio.charset.StandardCharsets.UTF_8);
+            
+            int exitCode = process.waitFor();
+            
+            if (exitCode != 0) {
+                log.error("Mermaid CLI failed. Exit code: {}, Output: {}, Error: {}", exitCode, output, error);
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Mermaid CLI 执行失败: " + error);
+            }
+        } catch (Exception e) {
+            log.error("Mermaid CLI execution error", e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Mermaid CLI 执行异常: " + e.getMessage());
+        }
+
         // 检查输出文件
         if (!tempOutputFile.exists() || tempOutputFile.length() == 0) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Mermaid CLI 执行失败");
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "Mermaid CLI 未生成输出文件");
         }
         // 清理输入文件，保留输出文件供上传使用
         FileUtil.del(tempInputFile);
