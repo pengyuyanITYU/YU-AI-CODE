@@ -1,5 +1,7 @@
 package com.yu.yuaicodemother.langgraph4j.node.concurrent;
 
+import cn.hutool.core.thread.ExecutorBuilder;
+import cn.hutool.core.thread.ThreadFactoryBuilder;
 import com.yu.yuaicodemother.exception.BusinessException;
 import com.yu.yuaicodemother.exception.ErrorCode;
 import com.yu.yuaicodemother.langgraph4j.model.QualityResult;
@@ -7,14 +9,13 @@ import com.yu.yuaicodemother.langgraph4j.node.*;
 import com.yu.yuaicodemother.langgraph4j.state.WorkflowContext;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
 import lombok.extern.slf4j.Slf4j;
-import org.bsc.langgraph4j.CompiledGraph;
-import org.bsc.langgraph4j.GraphRepresentation;
-import org.bsc.langgraph4j.GraphStateException;
-import org.bsc.langgraph4j.NodeOutput;
+import org.bsc.langgraph4j.*;
 import org.bsc.langgraph4j.prebuilt.MessagesState;
 import org.bsc.langgraph4j.prebuilt.MessagesStateGraph;
 
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import static org.bsc.langgraph4j.StateGraph.END;
 import static org.bsc.langgraph4j.StateGraph.START;
@@ -89,23 +90,38 @@ public class CodeGenConcurrentWorkflow {
                 .originalPrompt(originalPrompt)
                 .currentStep("初始化")
                 .build();
-        GraphRepresentation graph = workflow.getGraph(GraphRepresentation.Type.MERMAID);
-        log.info("并发工作流图:\n{}", graph.content());
-        log.info("开始执行并发代码生成工作流");
+        RunnableConfig config;
         WorkflowContext finalContext = null;
-        int stepCounter = 1;
-        for (NodeOutput<MessagesState<String>> step : workflow.stream(
-                Map.of(WorkflowContext.WORKFLOW_CONTEXT_KEY, initialContext)
-        )) {
-            log.info("--- 第 {} 步完成 ---", stepCounter);
-            WorkflowContext currentContext = WorkflowContext.getContext(step.state());
-            if (currentContext != null) {
-                finalContext = currentContext;
-                log.info("当前步骤上下文: {}", currentContext);
+        try (ExecutorService pool = ExecutorBuilder.create()
+                .setCorePoolSize(10)
+                .setMaxPoolSize(10)
+                .setWorkQueue(new LinkedBlockingDeque<>(100))
+
+                .setThreadFactory(ThreadFactoryBuilder.create().setNamePrefix("Parallel-Image-Collect").build())
+                .build()) {
+            config = RunnableConfig.builder()
+                    .addParallelNodeExecutor("image_plan", pool)
+                    .build();
+            GraphRepresentation graph = workflow.getGraph(GraphRepresentation.Type.MERMAID);
+            log.info("并发工作流图:\n{}", graph.content());
+            log.info("开始执行并发代码生成工作流");
+            int stepCounter = 1;
+            for (NodeOutput<MessagesState<String>> step : workflow.stream(
+                    Map.of(WorkflowContext.WORKFLOW_CONTEXT_KEY, initialContext),config
+            )) {
+                log.info("--- 第 {} 步完成 ---", stepCounter);
+                WorkflowContext currentContext = WorkflowContext.getContext(step.state());
+                if (currentContext != null) {
+                    finalContext = currentContext;
+                    log.info("当前步骤上下文: {}", currentContext);
+                }
+                stepCounter++;
             }
-            stepCounter++;
+            log.info("并发代码生成工作流执行完成！");
+        }catch (Exception e){
+            log.error("并发工作流执行失败: {}", e.getMessage(), e);
         }
-        log.info("并发代码生成工作流执行完成！");
+
         return finalContext;
     }
 
