@@ -11,15 +11,14 @@ import org.bsc.langgraph4j.prebuilt.MessagesState;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
 @Slf4j
 public class ContentImageCollectorNode {
 
-    // 限制最大图片数量，防止 Prompt 过长
-    private static final int MAX_IMAGES_TOTAL = 30;
+//    // 限制最大图片数量，防止 Prompt 过长
+//    private static final int MAX_IMAGES_TOTAL = 30;
 
     public static AsyncNodeAction<MessagesState<String>> create() {
         return node_async(state -> {
@@ -33,7 +32,8 @@ public class ContentImageCollectorNode {
                     for (ImageCollectionPlan.ImageSearchTask task : plan.getContentImageTasks()) {
                         List<ImageResource> images = imageSearchTool.searchContentImages(task.query());
                         if (images != null) {
-                            contentImages.add(images.get(0));
+//                           contentImages.add(images.get(0));
+                             contentImages.addAll(images);
                         }
                     }
                     log.info("内容图片收集完成，共收集到 {} 张图片", contentImages.size());
@@ -41,10 +41,10 @@ public class ContentImageCollectorNode {
             } catch (Exception e) {
                 log.error("内容图片收集失败: {}", e.getMessage(), e);
             }
-            // 2. 再次截断，确保总数不超标
-            List<ImageResource> finalImages = contentImages.stream()
-                    .limit(MAX_IMAGES_TOTAL)
-                    .collect(Collectors.toList());
+//            // 2. 再次截断，确保总数不超标
+//            List<ImageResource> finalImages = contentImages.stream()
+//                    .limit(MAX_IMAGES_TOTAL)
+//                    .collect(Collectors.toList());
             // 将收集到的图片存储到上下文的中间字段中
             context.setContentImages(contentImages);
             context.setCurrentStep("内容图片收集");

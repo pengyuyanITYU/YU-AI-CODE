@@ -15,20 +15,19 @@ import com.yu.yuaicodemother.exception.BusinessException;
 import com.yu.yuaicodemother.exception.ErrorCode;
 import com.yu.yuaicodemother.exception.ThrowUtils;
 import com.yu.yuaicodemother.model.dto.app.*;
+import com.yu.yuaicodemother.model.entity.App;
 import com.yu.yuaicodemother.model.entity.User;
-import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
 import com.yu.yuaicodemother.model.vo.app.AppVO;
+import com.yu.yuaicodemother.service.AppService;
 import com.yu.yuaicodemother.service.ProjectDownloadService;
 import com.yu.yuaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Autowired;
-import com.yu.yuaicodemother.model.entity.App;
-import com.yu.yuaicodemother.service.AppService;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -265,13 +264,12 @@ public class AppController {
     }
 
 
-    /**
-     * 分页获取精选应用列表
-     *
-     * @param appQueryRequest 查询请求
-     * @return 精选应用列表
-     */
     @PostMapping("/good/list/page/vo")
+    @Cacheable(
+            value = "good_app_page",
+            key = "T(com.yu.yuaicodemother.utils.CacheKeyUtils).generateKey(#appQueryRequest)",
+            condition = "#appQueryRequest.pageNum <= 10"
+    )
     public BaseResponse<Page<AppVO>> listGoodAppVOByPage(@RequestBody AppQueryRequest appQueryRequest) {
         ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR);
         // 限制每页最多 20 个

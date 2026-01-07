@@ -7,6 +7,9 @@ target/
 ### CUSTOM ###
 application-local.yml
 tmp
+logs
+.trae
+
 
 ### STS ###
 .apt_generated
