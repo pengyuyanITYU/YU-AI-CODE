@@ -66,7 +66,7 @@ public class JsonMessageStreamHandler {
                     String aiResponse = chatHistoryStringBuilder.toString();
                     chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
                     String projectDir = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                    vueProjectBuilder.buildProject(projectDir);
+                    vueProjectBuilder.buildProjectAsync(projectDir);
                 })
                 .doOnError(error -> {
                     // 如果AI回复失败，也要记录错误消息
