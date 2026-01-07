@@ -1,13 +1,12 @@
 package com.yu.yuaicodemother.core.handler;
 
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.yu.yuaicodemother.ai.model.message.AiResponseMessage;
+import com.yu.yuaicodemother.ai.model.message.BeforeToolExecuted;
 import com.yu.yuaicodemother.ai.model.message.StreamMessage;
 import com.yu.yuaicodemother.ai.model.message.ToolExecutedMessage;
-import com.yu.yuaicodemother.ai.model.message.BeforeToolExecuted;
 import com.yu.yuaicodemother.ai.tools.BaseTool;
 import com.yu.yuaicodemother.ai.tools.ToolManager;
 import com.yu.yuaicodemother.constant.AppConstant;
@@ -67,7 +66,7 @@ public class JsonMessageStreamHandler {
                     String aiResponse = chatHistoryStringBuilder.toString();
                     chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
                     String projectDir = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                    vueProjectBuilder.buildProjectAsync(projectDir);
+                    vueProjectBuilder.buildProject(projectDir);
                 })
                 .doOnError(error -> {
                     // 如果AI回复失败，也要记录错误消息
