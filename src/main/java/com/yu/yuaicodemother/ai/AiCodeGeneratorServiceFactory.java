@@ -2,7 +2,8 @@ package com.yu.yuaicodemother.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.yu.yuaicodemother.ai.tools.*;
+import com.yu.yuaicodemother.ai.guardrail.PromptSafetyInputGuardrail;
+import com.yu.yuaicodemother.ai.tools.ToolManager;
 import com.yu.yuaicodemother.exception.BusinessException;
 import com.yu.yuaicodemother.exception.ErrorCode;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
@@ -10,7 +11,6 @@ import com.yu.yuaicodemother.service.ChatHistoryService;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
-
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
@@ -25,7 +25,7 @@ import java.time.Duration;
 @Slf4j
 public class AiCodeGeneratorServiceFactory {
 
-    @Resource
+    @Resource(name = "openAiChatModel")
     private ChatModel chatModel;
 
     @Resource
@@ -91,6 +91,9 @@ public class AiCodeGeneratorServiceFactory {
                     .streamingChatModel(reasoningStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
                     .tools(toolManager.getAllTools())
+                    .inputGuardrails(new PromptSafetyInputGuardrail())
+                    .maxSequentialToolsInvocations(20) //最多连续调用20次工具 TODO 具体为多少得根据不同模型进行测试
+//                    .outputGuardrails(new RetryOutputGuardrail())   可能会导致流式输出的响应不及时
                     .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                             toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
                     ))
@@ -101,6 +104,8 @@ public class AiCodeGeneratorServiceFactory {
                     .chatModel(chatModel)
                     .streamingChatModel(openAiStreamingChatModel)
                     .chatMemory(chatMemory)
+                    .inputGuardrails(new PromptSafetyInputGuardrail())
+//                  .outputGuardrails(new RetryOutputGuardrail())  可能会导致流式输出的响应不及时
                     .build();
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR,
                     "不支持的代码生成类型: " + codeGenType.getValue());

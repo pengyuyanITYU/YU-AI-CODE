@@ -6,8 +6,10 @@ import com.yu.yuaicodemother.ai.AiCodeGeneratorServiceFactory;
 import com.yu.yuaicodemother.ai.model.HtmlCodeResult;
 import com.yu.yuaicodemother.ai.model.MultiFileCodeResult;
 import com.yu.yuaicodemother.ai.model.message.AiResponseMessage;
-import com.yu.yuaicodemother.ai.model.message.ToolExecutedMessage;
 import com.yu.yuaicodemother.ai.model.message.BeforeToolExecuted;
+import com.yu.yuaicodemother.ai.model.message.ToolExecutedMessage;
+import com.yu.yuaicodemother.constant.AppConstant;
+import com.yu.yuaicodemother.core.builder.VueProjectBuilder;
 import com.yu.yuaicodemother.core.saver.CodeFileSaverExecutor;
 import com.yu.yuaicodemother.exception.BusinessException;
 import com.yu.yuaicodemother.exception.ErrorCode;
@@ -33,6 +35,9 @@ public class AiCodeGeneratorFacade {
 
     @Resource
     private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
+
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
 
     /**
      * 统一入口：根据类型生成并保存代码（使用 appId）
@@ -91,7 +96,7 @@ public class AiCodeGeneratorFacade {
             }
             case VUE_PROJECT -> {
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCode(appId, userMessage);
-                yield processTokenStream(tokenStream);
+                yield processTokenStream(tokenStream,appId);
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
@@ -106,7 +111,7 @@ public class AiCodeGeneratorFacade {
      * @param tokenStream TokenStream 对象
      * @return Flux<String> 流式响应
      */
-    private Flux<String> processTokenStream(TokenStream tokenStream) {
+    private Flux<String> processTokenStream(TokenStream tokenStream,Long appId) {
         return Flux.create(sink -> {
             tokenStream.onPartialResponse((String partialResponse) -> {
                         AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
@@ -126,8 +131,12 @@ public class AiCodeGeneratorFacade {
                         sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
                     })
                     .onCompleteResponse((ChatResponse response) -> {
-                        sink.complete(); // 告诉前端：流结束了，不用再等待数据了
+                        // 执行 Vue 项目构建（同步执行，确保预览时项目已就绪）
+                        String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_" + appId;
+                        vueProjectBuilder.buildProject(projectPath);
+                        sink.complete();
                     })
+
                     .onError((Throwable error) -> {
                         error.printStackTrace();
                         sink.error(error); // 告诉前端：出错了

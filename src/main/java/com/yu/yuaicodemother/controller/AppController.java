@@ -18,6 +18,8 @@ import com.yu.yuaicodemother.model.dto.app.*;
 import com.yu.yuaicodemother.model.entity.App;
 import com.yu.yuaicodemother.model.entity.User;
 import com.yu.yuaicodemother.model.vo.app.AppVO;
+import com.yu.yuaicodemother.ratelimit.annotation.RateLimit;
+import com.yu.yuaicodemother.ratelimit.enums.RateLimitType;
 import com.yu.yuaicodemother.service.AppService;
 import com.yu.yuaicodemother.service.ProjectDownloadService;
 import com.yu.yuaicodemother.service.UserService;
@@ -55,8 +57,7 @@ public class AppController {
     private ProjectDownloadService projectDownloadService;
 
 
-
-
+    @RateLimit(limitType = RateLimitType.USER, rate = 5, rateInterval = 60, message = "AI 对话请求过于频繁，请稍后再试")
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                                        @RequestParam String message,

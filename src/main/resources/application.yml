@@ -78,6 +78,14 @@ langchain4j:
       max-tokens: 8192
       log-requests: true
       log-responses: true
+    # 智能路由 AI 模型配置
+    routing-chat-model:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: <your-api-key>
+      model-name: qwen-turbo
+      max-tokens: 100
+      log-requests: true
+      log-responses: true
 
 # Pexels 图片搜索配置
 pexels:
@@ -86,6 +94,18 @@ pexels:
 dashscope:
   api-key: <Your API Key>
   image-model: qwen-image
+#监控
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: always
 
+logging:
+  level:
+    dev.langchain4j: DEBUG
 
 

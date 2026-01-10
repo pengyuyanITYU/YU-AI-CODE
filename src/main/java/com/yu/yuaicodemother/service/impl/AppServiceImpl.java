@@ -25,6 +25,8 @@ import com.yu.yuaicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
 import com.yu.yuaicodemother.model.vo.app.AppVO;
 import com.yu.yuaicodemother.model.vo.user.UserVO;
+import com.yu.yuaicodemother.monitor.MonitorContext;
+import com.yu.yuaicodemother.monitor.MonitorContextHolder;
 import com.yu.yuaicodemother.service.AppService;
 import com.yu.yuaicodemother.service.ChatHistoryService;
 import com.yu.yuaicodemother.service.ScreenshotService;
@@ -118,10 +120,18 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
         // 5. 通过校验后，添加用户消息到对话历史
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
+        MonitorContextHolder.setContext(MonitorContext.builder()
+                        .appId(appId.toString())
+                        .userId(loginUser.getId().toString())
+                        .build());
         // 6. 调用 AI 生成代码（流式）
         Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
         // 7. 收集AI响应内容并在完成后记录到对话历史
-        Flux<String> result = streamHandlerExecutor.doExecute(contentFlux, chatHistoryService, appId, loginUser, codeGenTypeEnum);
+        Flux<String> result = streamHandlerExecutor
+                .doExecute(contentFlux, chatHistoryService, appId, loginUser, codeGenTypeEnum)
+                .doFinally(signalType ->
+                        //流结束后清理 无论成功/失败/取消
+                        MonitorContextHolder.clearContext());
         return result;
     }
 

@@ -9,7 +9,8 @@ application-local.yml
 tmp
 logs
 .trae
-
+yu-ai-code-mother-frontend
+AliyunJavaAgent
 
 ### STS ###
 .apt_generated

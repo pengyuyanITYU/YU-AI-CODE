@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AiCodeGenTypeRoutingServiceFactory {
 
-    @Resource
+    @Resource(name = "routingChatModelPrototype")
     private ChatModel chatModel;
 
     /**
