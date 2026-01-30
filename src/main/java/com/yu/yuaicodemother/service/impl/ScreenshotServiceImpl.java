@@ -85,4 +85,9 @@ public class ScreenshotServiceImpl implements ScreenshotService {
             log.info("本地截图文件已清理: {}", localFilePath);
         }
     }
+
+    @Override
+    public void deleteByAppId(Long appId) {
+
+    }
 }

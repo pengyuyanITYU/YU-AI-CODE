@@ -3,6 +3,7 @@ package com.yu.yuaicodemother.model.vo.app;
 import com.yu.yuaicodemother.model.vo.user.UserVO;
 import lombok.Data;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
@@ -69,5 +70,11 @@ public class AppVO implements Serializable {
      */
     private UserVO user;
 
+    /**
+     * 可见范围
+     */
+    private boolean visualRange;
+
+    @Serial
     private static final long serialVersionUID = 1L;
 }

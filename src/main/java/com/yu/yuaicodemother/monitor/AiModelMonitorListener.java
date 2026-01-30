@@ -30,6 +30,9 @@ import java.util.Map;
 @Slf4j
 public class AiModelMonitorListener implements ChatModelListener {
 
+
+    @Resource
+    private AiModelMetricsCollector aiModelMetricsCollector;
     /**
      * 属性键：请求开始时间
      * 用于在 attributes Map 中存储 Instant 对象，以便在响应/错误时计算耗时。
@@ -46,8 +49,7 @@ public class AiModelMonitorListener implements ChatModelListener {
      */
     private static final String MONITOR_CONTEXT_KEY = "monitor_context";
 
-    @Resource
-    private AiModelMetricsCollector aiModelMetricsCollector;
+
 
     /**
      * 请求发起前的回调
@@ -125,6 +127,7 @@ public class AiModelMonitorListener implements ChatModelListener {
      */
     @Override
     public void onError(ChatModelErrorContext errorContext) {
+
         // ⚠️ 优化建议：
         // 当前代码直接调用 MonitorContextHolder.getContext()。
         // 如果 onError 在异步线程触发，这里可能取不到值。

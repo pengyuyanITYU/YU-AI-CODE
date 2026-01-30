@@ -8,6 +8,7 @@ import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.yu.yuaicodemother.ai.AiCodeGenTypeRoutingService;
+import com.yu.yuaicodemother.ai.AiCodeGenerateAppNameService;
 import com.yu.yuaicodemother.ai.model.CodeGenTypeRoutingResult;
 import com.yu.yuaicodemother.constant.AppConstant;
 import com.yu.yuaicodemother.core.AiCodeGeneratorFacade;
@@ -34,6 +35,7 @@ import com.yu.yuaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
@@ -47,13 +49,12 @@ import java.util.stream.Collectors;
 
 /**
  * 应用 服务层实现。
- *
+ * 
  * @author 鱼🐟
  */
 @Slf4j
 @Service
-public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppService{
-
+public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppService {
 
     @Resource
     private UserService userService;
@@ -76,6 +77,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
     @Resource
     private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
 
+    @Resource
+    private AiCodeGenerateAppNameService aiCodeGenerateAppNameService;
+
     @Override
     public Long createApp(AppAddRequest appAddRequest, User loginUser) {
         // 参数校验
@@ -85,8 +89,20 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         App app = new App();
         BeanUtil.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
-        // 应用名称暂时为 initPrompt 前 12 位
-        app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 15)));
+        app.setVisualRange(true);
+        String appName = null;
+        try {
+            appName = aiCodeGenerateAppNameService.generateAppName(initPrompt);
+        } catch (Exception e) {
+            // TODO 生成app名称,失败不给它抛错
+            log.error("应用名称生成失败");
+        }
+        if (appName == null) {
+            // 如果ai生成结果为null,应用名称为initPrompt 前 12 位
+            app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 15)));
+        } else {
+            app.setAppName(appName);
+        }
         // 使用 AI 智能选择代码生成类型
         CodeGenTypeRoutingResult result = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
         CodeGenTypeEnum selectedCodeGenType = result.getType();
@@ -97,7 +113,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         log.info("应用创建成功，ID: {}, 类型: {}", app.getId(), selectedCodeGenType.getValue());
         return app.getId();
     }
-
 
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
@@ -117,21 +132,21 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
         }
-        chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
-        // 5. 通过校验后，添加用户消息到对话历史
-        chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
+        // 5. 通过校验后,添加用户消息到对话历史
+        chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(),
+                loginUser.getId());
         MonitorContextHolder.setContext(MonitorContext.builder()
-                        .appId(appId.toString())
-                        .userId(loginUser.getId().toString())
-                        .build());
+                .appId(appId.toString())
+                .userId(loginUser.getId().toString())
+                .build());
         // 6. 调用 AI 生成代码（流式）
         Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
         // 7. 收集AI响应内容并在完成后记录到对话历史
         Flux<String> result = streamHandlerExecutor
                 .doExecute(contentFlux, chatHistoryService, appId, loginUser, codeGenTypeEnum)
                 .doFinally(signalType ->
-                        //流结束后清理 无论成功/失败/取消
-                        MonitorContextHolder.clearContext());
+                // 流结束后清理 无论成功/失败/取消
+                MonitorContextHolder.clearContext());
         return result;
     }
 
@@ -142,6 +157,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
      * @return 是否成功
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean removeById(Serializable id) {
         if (id == null) {
             return false;
@@ -158,16 +174,33 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
             // 记录日志但不阻止应用删除
             log.error("删除应用关联对话历史失败: {}", e.getMessage());
         }
+        // 删除应用目录下生成的文件
+        App app = getById(appId);
+        try {
+            String output = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + app.getCodeGenType() + "_" + appId;
+            FileUtil.del(output);
+        } catch (Exception e) {
+            // 删除失败，记录日志但不阻止应用删除
+            log.error("删除应用输出目录失败: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.OPERATION_ERROR);
+        }
+        // 删除部署目录下生成的文件
+        String deployKey = app.getDeployKey();
+        if (deployKey == null || deployKey.isEmpty()) {
+            return super.removeById(id);
+        }
+        try {
+            String deploy = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
+            FileUtil.del(deploy);
+        } catch (Exception e) {
+            log.error("删除应用部署目录失败: {}", e.getMessage());
+            throw new BusinessException(ErrorCode.OPERATION_ERROR);
+        }
+        // 删除应用截图
+        screenshotService.deleteByAppId(appId);
         // 删除应用
         return super.removeById(id);
     }
-
-
-
-
-
-
-
 
     @Override
     public String deployApp(Long appId, User loginUser) {
@@ -253,8 +286,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
         });
     }
 
-
-
     @Override
     public AppVO getAppVO(App app) {
         if (app == null) {
@@ -317,8 +348,5 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App>  implements AppS
             return appVO;
         }).collect(Collectors.toList());
     }
-
-
-
 
 }

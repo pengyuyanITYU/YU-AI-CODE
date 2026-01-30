@@ -2,6 +2,7 @@ package com.yu.yuaicodemother.core.handler;
 
 import com.yu.yuaicodemother.model.entity.User;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
+import com.yu.yuaicodemother.service.AppVersionService;
 import com.yu.yuaicodemother.service.ChatHistoryService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,9 @@ public class StreamHandlerExecutor {
     @Resource
     private JsonMessageStreamHandler jsonMessageStreamHandler;
 
+    @Resource
+    private AppVersionService appVersionService;
+
     /**
      * 创建流处理器并处理聊天历史记录
      *
@@ -32,13 +36,20 @@ public class StreamHandlerExecutor {
      * @return 处理后的流
      */
     public Flux<String> doExecute(Flux<String> originFlux,
-                                  ChatHistoryService chatHistoryService,
-                                  long appId, User loginUser, CodeGenTypeEnum codeGenType) {
-        return switch (codeGenType) {
-            case VUE_PROJECT -> // 使用注入的组件实例
-                    jsonMessageStreamHandler.handle(originFlux, chatHistoryService, appId, loginUser);
-            case HTML, MULTI_FILE -> // 简单文本处理器不需要依赖注入
-                    new SimpleTextStreamHandler().handle(originFlux, chatHistoryService, appId, loginUser);
+            ChatHistoryService chatHistoryService,
+            long appId, User loginUser, CodeGenTypeEnum codeGenType) {
+        Flux<String> resultFlux = switch (codeGenType) {
+            case VUE_PROJECT ->
+                jsonMessageStreamHandler.handle(originFlux, chatHistoryService, appId, loginUser);
+            case HTML, MULTI_FILE ->
+                new SimpleTextStreamHandler().handle(originFlux, chatHistoryService, appId, loginUser);
         };
+        return resultFlux.doOnComplete(() -> {
+            try {
+                appVersionService.createVersion(appId, "AI生成代码");
+            } catch (Exception e) {
+                log.error("版本创建失败: appId={}, error={}", appId, e.getMessage());
+            }
+        });
     }
 }

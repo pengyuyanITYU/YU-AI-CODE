@@ -7,9 +7,9 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.yu.yuaicodemother.exception.BusinessException;
 import com.yu.yuaicodemother.exception.ErrorCode;
+import com.yu.yuaicodemother.mapper.UserMapper;
 import com.yu.yuaicodemother.model.dto.user.UserQueryRequest;
 import com.yu.yuaicodemother.model.entity.User;
-import com.yu.yuaicodemother.mapper.UserMapper;
 import com.yu.yuaicodemother.model.enums.UserRoleEnum;
 import com.yu.yuaicodemother.model.vo.user.LoginUserVO;
 import com.yu.yuaicodemother.model.vo.user.UserVO;
@@ -17,9 +17,9 @@ import com.yu.yuaicodemother.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
-import java.util.List;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.yu.yuaicodemother.constant.UserConstant.USER_LOGIN_STATE;
@@ -110,6 +110,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
         }
         // 3. 记录用户的登录态
         request.getSession().setAttribute(USER_LOGIN_STATE, user);
+        if(user.getUserRole() == null){
+          request.getSession().setAttribute("USER_ROLE", UserRoleEnum.USER.getValue());
+        }
+        request.getSession().setAttribute("USER_ROLE", user.getUserRole());
         // 4. 获得脱敏后的用户信息
         return this.getLoginUserVO(user);
     }

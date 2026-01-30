@@ -1,31 +1,28 @@
 package com.yu.yuaicodemother.constant;
 
-public interface AppConstant {
+import java.io.File;
 
-    /**
-     * 精选应用的优先级
-     */
-    Integer GOOD_APP_PRIORITY = 99;
+public final class AppConstant {
 
-    /**
-     * 默认应用优先级
-     */
-    Integer DEFAULT_APP_PRIORITY = 0;
+        private static final String USER_DIR = System.getProperty("user.dir");
+
+        public static final int GOOD_APP_PRIORITY = 99;
+
+        public static final int DEFAULT_APP_PRIORITY = 0;
 
 
-    /**
-     * 应用生成目录
-     */
-    String CODE_OUTPUT_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_output";
+        public static final String CODE_OUTPUT_ROOT_DIR = USER_DIR + File.separator + "tmp" + File.separator
+                        + "code_output"
+                        + File.separator;
 
-    /**
-     * 应用部署目录
-     */
-    String CODE_DEPLOY_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_deploy";
+        public static final String CODE_DEPLOY_ROOT_DIR = USER_DIR + File.separator + "tmp" + File.separator
+                        + "code_deploy"
+                        + File.separator;
 
-    /**
-     * 应用部署域名
-     */
-    String CODE_DEPLOY_HOST = "http://localhost";
+        public static final String CODE_DEPLOY_HOST = "http://localhost";
+
+        private AppConstant() {
+                throw new UnsupportedOperationException("Constant class cannot be instantiated");
+        }
 
 }

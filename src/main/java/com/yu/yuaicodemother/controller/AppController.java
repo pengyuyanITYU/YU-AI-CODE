@@ -26,6 +26,8 @@ import com.yu.yuaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -45,6 +47,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/app")
+@Slf4j
 public class AppController {
 
     @Resource
@@ -268,10 +271,10 @@ public class AppController {
     @PostMapping("/good/list/page/vo")
     @Cacheable(
             value = "good_app_page",
-            key = "T(com.yu.yuaicodemother.utils.CacheKeyUtils).generateKey(#appQueryRequest)",
+            key = "T(com.yu.yuaicodemother.utils.CacheKeyUtils).generateKey(#appQueryRequest,#request.getAttribute('USER_ROLE'))",
             condition = "#appQueryRequest.pageNum <= 10"
     )
-    public BaseResponse<Page<AppVO>> listGoodAppVOByPage(@RequestBody AppQueryRequest appQueryRequest) {
+    public BaseResponse<Page<AppVO>> listGoodAppVOByPage(@RequestBody AppQueryRequest appQueryRequest,HttpServletRequest  request) {
         ThrowUtils.throwIf(appQueryRequest == null, ErrorCode.PARAMS_ERROR);
         // 限制每页最多 20 个
         long pageSize = appQueryRequest.getPageSize();
@@ -280,6 +283,18 @@ public class AppController {
         // 只查询精选的应用
         appQueryRequest.setPriority(AppConstant.GOOD_APP_PRIORITY);
         QueryWrapper queryWrapper = appService.getQueryWrapper(appQueryRequest);
+        User LoginUser = userService.getLoginUser(request);
+        Long userId = LoginUser == null ? -1 : LoginUser.getId();
+        if (userId == null || userId <= 0) {
+            log.error("用户ID非法");
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User user = userService.getById(userId);
+        ThrowUtils.throwIf(user == null, ErrorCode.NOT_FOUND_ERROR);
+        //如果是默认用户则只能看公开的应用
+        if(user.getUserRole().equals(UserConstant.DEFAULT_ROLE)){
+            queryWrapper.eq(App::isVisualRange, true);
+        }
         // 分页查询
         Page<App> appPage = appService.page(Page.of(pageNum, pageSize), queryWrapper);
         // 数据封装
@@ -373,6 +388,19 @@ public class AppController {
         return ResultUtils.success(appService.getAppVO(app));
     }
 
+    @PostMapping("/visualRange/{appId}")
+    @CacheEvict(value = "good_app_page",allEntries = true)
+    public BaseResponse<Boolean> updateVisualRange(@PathVariable Long appId,@RequestParam boolean visualRange) {
+        // 获取应用
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
+        app.setVisualRange(visualRange);
+        boolean b = appService.updateById(app);
+        ThrowUtils.throwIf(!b, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(b);
+    }
+
+    }
 
 
 
@@ -381,5 +409,3 @@ public class AppController {
 
 
 
-
-}

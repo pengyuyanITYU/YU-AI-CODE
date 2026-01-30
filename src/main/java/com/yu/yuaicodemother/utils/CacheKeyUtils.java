@@ -3,6 +3,9 @@ package com.yu.yuaicodemother.utils;
 import cn.hutool.crypto.digest.DigestUtil;
 import cn.hutool.json.JSONUtil;
 
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * 缓存 key 生成工具类
  *
@@ -24,4 +27,22 @@ public class CacheKeyUtils {
         String jsonStr = JSONUtil.toJsonStr(obj);
         return DigestUtil.md5Hex(jsonStr);
     }
+
+
+    /**
+     * 根据两个对象生成组合缓存key (JSON + MD5)
+     * 适用于 @Cacheable(key = "T(YourUtils).generateKey(#obj1, #obj2)")
+     */
+    public static String generateKey(Object obj1, Object obj2) {
+        // 将两个对象放入列表，保证顺序和结构的固定
+        // Arrays.asList 允许元素为 null
+        List<Object> keys = Arrays.asList(obj1, obj2);
+
+        // 转为 JSON 数组字符串，例如: ["requestData", "ADMIN"]
+        String jsonStr = JSONUtil.toJsonStr(keys);
+
+        // 生成 MD5
+        return DigestUtil.md5Hex(jsonStr);
+    }
+
 }

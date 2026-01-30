@@ -7,6 +7,7 @@ import com.qcloud.cos.model.PutObjectResult;
 import com.yu.yuaicodemother.config.CosClientConfig;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
@@ -23,6 +24,7 @@ import java.net.URLConnection;
  */
 @Component
 @Slf4j
+@ConditionalOnBean(COSClient.class)
 public class CosManager {
 
     @Resource

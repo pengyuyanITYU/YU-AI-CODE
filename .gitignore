@@ -3,15 +3,24 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+out
 
 ### CUSTOM ###
 application-local.yml
 tmp
 logs
 .trae
-yu-ai-code-mother-frontend
 AliyunJavaAgent
-
+yu-ai-code-microservice
+.trae
+.claude
+skills
+.agent
+*.docx
+*.drawio
+yu-ai-code-microservice
+*.txt
+summary
 ### STS ###
 .apt_generated
 .classpath
@@ -20,13 +29,14 @@ AliyunJavaAgent
 .settings
 .springBeans
 .sts4-cache
+/AliyunJavaAgent
 
 ### IntelliJ IDEA ###
 .idea
 *.iws
 *.iml
 *.ipr
-
+version
 ### NetBeans ###
 /nbproject/private/
 /nbbuild/
@@ -36,6 +46,6 @@ AliyunJavaAgent
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
-
+summary
 ### VS Code ###
 .vscode/

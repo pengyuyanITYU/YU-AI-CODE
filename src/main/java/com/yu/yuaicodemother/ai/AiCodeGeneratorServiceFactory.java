@@ -28,7 +28,7 @@ public class AiCodeGeneratorServiceFactory {
     @Resource(name = "openAiChatModel")
     private ChatModel chatModel;
 
-    @Resource
+    @Resource(name = "streamingChatModelCustom")
     private StreamingChatModel openAiStreamingChatModel;
 
     @Resource(name = "reasoningStreamingChatModel")
@@ -42,7 +42,6 @@ public class AiCodeGeneratorServiceFactory {
 
     @Resource
     private ToolManager toolManager;
-
 
 
 
@@ -61,7 +60,6 @@ public class AiCodeGeneratorServiceFactory {
                 log.debug("AI 服务实例被移除，appId: {}, 原因: {}", key, cause);
             })
             .build();
-
     /**
      * 根据 appId和代码生成类型获取服务（带缓存）
      */
@@ -70,6 +68,7 @@ public class AiCodeGeneratorServiceFactory {
         return serviceCache.get(cacheKey,
                 key -> createAiCodeGeneratorService(appId, codeGenType));
     }
+
 
     /**
      * 创建新的 AI 服务实例

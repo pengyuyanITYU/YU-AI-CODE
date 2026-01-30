@@ -16,6 +16,7 @@ public class ImageCollectionPlanServiceFactory {
     public ImageCollectionPlanService createImageCollectionPlanService() {
         return AiServices.builder(ImageCollectionPlanService.class)
                 .chatModel(chatModel)
+                .maxSequentialToolsInvocations(20)
                 .build();
     }
 }

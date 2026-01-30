@@ -50,8 +50,9 @@ public class AiCodeGeneratorFacade {
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成类型为空");
         }
-//        根据appId获取对应的AI服务实例
-        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
+        // 根据appId获取对应的AI服务实例
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId,
+                codeGenTypeEnum);
         return switch (codeGenTypeEnum) {
             case HTML -> {
                 HtmlCodeResult result = aiCodeGeneratorService.generateHTMLCode(userMessage);
@@ -61,10 +62,12 @@ public class AiCodeGeneratorFacade {
                 MultiFileCodeResult result = aiCodeGeneratorService.generateMultiFileCode(userMessage);
                 yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.MULTI_FILE, appId);
             }
-//            case VUE_PROJECT -> {
-//                Flux<String> codeStream = aiCodeGeneratorService.generateVueProjectCode(appId, userMessage);
-//                yield CodeFileSaverExecutor.executeSaver(codeStream, CodeGenTypeEnum.VUE_PROJECT, appId);
-//            }
+            // case VUE_PROJECT -> {
+            // Flux<String> codeStream =
+            // aiCodeGeneratorService.generateVueProjectCode(appId, userMessage);
+            // yield CodeFileSaverExecutor.executeSaver(codeStream,
+            // CodeGenTypeEnum.VUE_PROJECT, appId);
+            // }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, errorMessage);
@@ -83,8 +86,9 @@ public class AiCodeGeneratorFacade {
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成类型为空");
         }
-        //        根据appId获取对应的AI服务实例
-        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenTypeEnum);
+        // 根据appId获取对应的AI服务实例
+        AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId,
+                codeGenTypeEnum);
         return switch (codeGenTypeEnum) {
             case HTML -> {
                 Flux<String> codeStream = aiCodeGeneratorService.generateHTMLCodeStream(userMessage);
@@ -96,7 +100,7 @@ public class AiCodeGeneratorFacade {
             }
             case VUE_PROJECT -> {
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCode(appId, userMessage);
-                yield processTokenStream(tokenStream,appId);
+                yield processTokenStream(tokenStream, appId);
             }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
@@ -111,13 +115,13 @@ public class AiCodeGeneratorFacade {
      * @param tokenStream TokenStream 对象
      * @return Flux<String> 流式响应
      */
-    private Flux<String> processTokenStream(TokenStream tokenStream,Long appId) {
+    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId) {
         return Flux.create(sink -> {
             tokenStream.onPartialResponse((String partialResponse) -> {
-                        AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
-                        sink.next(JSONUtil.toJsonStr(aiResponseMessage));
-//                      操作：将这段文本封装进 AiResponseMessage 对象，转为 JSON，通过 sink.next 推送给前端。
-                    })
+                AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
+                sink.next(JSONUtil.toJsonStr(aiResponseMessage));
+                // 操作：将这段文本封装进 AiResponseMessage 对象，转为 JSON，通过 sink.next 推送给前端。
+            })
                     .onPartialThinking((PartialThinking partialThinking) -> {
                         String text = partialThinking.text();
                         sink.next(JSONUtil.toJsonStr(text));
@@ -141,10 +145,9 @@ public class AiCodeGeneratorFacade {
                         error.printStackTrace();
                         sink.error(error); // 告诉前端：出错了
                     })
-                    .start();  //必须调用 start()，TokenStream 才会真正开始请求 AI 模型并产生数据。
+                    .start(); // 必须调用 start()，TokenStream 才会真正开始请求 AI 模型并产生数据。
         });
     }
-
 
     /**
      * 通用流式代码处理方法（使用 appId）

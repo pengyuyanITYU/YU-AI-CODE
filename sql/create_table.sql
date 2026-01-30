@@ -65,3 +65,20 @@ create table chat_history
     INDEX idx_createTime (createTime),             -- 提升基于时间的查询性能
     INDEX idx_appId_createTime (appId, createTime) -- 游标查询核心索引
 ) comment '对话历史' collate = utf8mb4_unicode_ci;
+
+-- 扩展
+-- 版本化管理
+-- 应用主表 (保持现状，只需记录当前最新版本号)
+ALTER TABLE app ADD COLUMN current_version INT DEFAULT 0;
+
+-- 新增：应用版本历史表
+CREATE TABLE app_versions (
+                              id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                              app_id BIGINT NOT NULL,          -- 关联 app 表
+                              version INT NOT NULL,            -- 版本号 (1, 2, 3...)
+                              source_code_path VARCHAR(255),   -- 关键：该版本代码的物理存储路径
+                              deploy_key VARCHAR(64),          -- 该版本的部署key
+                              change_log TEXT,                 -- 你说的"distraction"，存变更描述
+                              createTime  DATETIME DEFAULT CURRENT_TIMESTAMP,
+                              INDEX idx_app_version (app_id, version)
+);

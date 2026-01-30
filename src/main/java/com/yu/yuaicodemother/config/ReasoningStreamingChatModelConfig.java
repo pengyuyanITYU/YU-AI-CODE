@@ -29,7 +29,7 @@ public class ReasoningStreamingChatModelConfig {
     private boolean logResponses;
 
     @Resource
-    private AiModelMonitorListener aiModelMonitorListener;
+    private AiModelMonitorListener AiModelMonitorListener;
 
     /**
      * 推理流式模型（用于 Vue 项目生成，带工具调用）
@@ -47,7 +47,7 @@ public class ReasoningStreamingChatModelConfig {
                 .baseUrl(baseUrl)
                 .modelName(modelName)
                 .maxTokens(maxTokens)
-                .listeners(List.of(aiModelMonitorListener))
+                .listeners(List.of(AiModelMonitorListener))
                 .logRequests(logRequests)
                 .logResponses(logResponses)
                 .build();
