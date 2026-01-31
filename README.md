@@ -15,5 +15,13 @@
 <img width="2560" height="1389" alt="image (8)" src="https://github.com/user-attachments/assets/1a22e922-3a0c-4b6f-91a6-8108fb58734c" />
 (4）企业级管⁡理
 提供用户管理、应用管⁠理、系统监控、业务指标监‌控等后台功能，管理员可以‌设置精选应用、监控 AI‎ 调用情况和系统性能。
+常见问题:
+1.API怎么获取?
+(1)上阿里云百炼有免费新人额度。
+(2)谷歌AIStudio也有免费调用额度。
+(3)去各大公司充值专门的API资源包。
+2.谷歌AIStudio进不去?
+(1)用github比较火的VPN(95.2kStar),主要是便宜才20多块钱一个月
+https://github.com/clash-verge-rev/clash-verge-rev.git
 ​​
     
