@@ -65,17 +65,23 @@ public class AiModelMetricsCollector {
      * @param status    请求状态 (如: "SUCCESS", "FAILED", "TIMEOUT")，用于计算成功率
      */
     public void recordRequest(String userId, String appId, String modelName, String status) {
+        // 归一化处理，防止 null 导致 Micrometer 报错
+        String finalUserId = defaultIfNull(userId);
+        String finalAppId = defaultIfNull(appId);
+        String finalModelName = defaultIfNull(modelName);
+        String finalStatus = defaultIfNull(status);
+
         // 拼接唯一Key，用于在本地 Map 中查找是否已存在该 Counter
-        String key = String.format("%s_%s_%s_%s", userId, appId, modelName, status);
+        String key = String.format("%s_%s_%s_%s", finalUserId, finalAppId, finalModelName, finalStatus);
 
         // computeIfAbsent 保证线程安全：如果 Key 不存在则创建并注册，存在则直接返回
         Counter counter = requestCountersCache.computeIfAbsent(key, k ->
                 Counter.builder("ai_model_requests_total") // 指标名称 (Prometheus 中显示的 metric name)
                         .description("AI模型总请求次数")       // 指标描述
-                        .tag("user_id", userId)            // 维度标签：用户
-                        .tag("app_id", appId)              // 维度标签：应用
-                        .tag("model_name", modelName)      // 维度标签：模型
-                        .tag("status", status)             // 维度标签：状态
+                        .tag("user_id", finalUserId)            // 维度标签：用户
+                        .tag("app_id", finalAppId)              // 维度标签：应用
+                        .tag("model_name", finalModelName)      // 维度标签：模型
+                        .tag("status", finalStatus)             // 维度标签：状态
                         .register(meterRegistry)           // 注册到 Micrometer
         );
 
@@ -100,14 +106,19 @@ public class AiModelMetricsCollector {
      * @param errorMessage 错误类型摘要 (如: "API_KEY_INVALID", "CONTEXT_LENGTH_EXCEEDED")
      */
     public void recordError(String userId, String appId, String modelName, String errorMessage) {
-        String key = String.format("%s_%s_%s_%s", userId, appId, modelName, errorMessage);
+        String finalUserId = defaultIfNull(userId);
+        String finalAppId = defaultIfNull(appId);
+        String finalModelName = defaultIfNull(modelName);
+        String finalErrorMessage = defaultIfNull(errorMessage);
+
+        String key = String.format("%s_%s_%s_%s", finalUserId, finalAppId, finalModelName, finalErrorMessage);
         Counter counter = errorCountersCache.computeIfAbsent(key, k ->
                 Counter.builder("ai_model_errors_total")
                         .description("AI模型错误次数")
-                        .tag("user_id", userId)
-                        .tag("app_id", appId)
-                        .tag("model_name", modelName)
-                        .tag("error_message", errorMessage) // 关键标签：错误原因
+                        .tag("user_id", finalUserId)
+                        .tag("app_id", finalAppId)
+                        .tag("model_name", finalModelName)
+                        .tag("error_message", finalErrorMessage) // 关键标签：错误原因
                         .register(meterRegistry)
         );
 
@@ -133,15 +144,20 @@ public class AiModelMetricsCollector {
             return;
         }
 
-        String key = String.format("%s_%s_%s_%s", userId, appId, modelName, tokenType);
+        String finalUserId = defaultIfNull(userId);
+        String finalAppId = defaultIfNull(appId);
+        String finalModelName = defaultIfNull(modelName);
+        String finalTokenType = defaultIfNull(tokenType);
+
+        String key = String.format("%s_%s_%s_%s", finalUserId, finalAppId, finalModelName, finalTokenType);
 
         Counter counter = tokenCountersCache.computeIfAbsent(key, k ->
                 Counter.builder("ai_model_tokens_total")
                         .description("AI模型Token消耗总数")
-                        .tag("user_id", userId)
-                        .tag("app_id", appId)
-                        .tag("model_name", modelName)
-                        .tag("token_type", tokenType) // 区分是提问消耗还是回答消耗
+                        .tag("user_id", finalUserId)
+                        .tag("app_id", finalAppId)
+                        .tag("model_name", finalModelName)
+                        .tag("token_type", finalTokenType) // 区分是提问消耗还是回答消耗
                         .register(meterRegistry)
         );
 
@@ -165,19 +181,27 @@ public class AiModelMetricsCollector {
      * @param duration  本次请求的耗时对象 (Duration.ofMillis(xxx))
      */
     public void recordResponseTime(String userId, String appId, String modelName, Duration duration) {
-        String key = String.format("%s_%s_%s", userId, appId, modelName);
+        String finalUserId = defaultIfNull(userId);
+        String finalAppId = defaultIfNull(appId);
+        String finalModelName = defaultIfNull(modelName);
+
+        String key = String.format("%s_%s_%s", finalUserId, finalAppId, finalModelName);
 
         Timer timer = responseTimersCache.computeIfAbsent(key, k ->
                 Timer.builder("ai_model_response_duration_seconds")
                         .description("AI模型响应时间")
-                        .tag("user_id", userId)
-                        .tag("app_id", appId)
-                        .tag("model_name", modelName)
+                        .tag("user_id", finalUserId)
+                        .tag("app_id", finalAppId)
+                        .tag("model_name", finalModelName)
                         // 注意：Timer 默认单位通常是秒，Micrometer 会自动处理单位转换
                         .register(meterRegistry)
         );
 
         // 记录本次耗时
         timer.record(duration);
+    }
+
+    private String defaultIfNull(String value) {
+        return value == null ? "unknown" : value;
     }
 }

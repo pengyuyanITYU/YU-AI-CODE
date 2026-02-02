@@ -71,11 +71,13 @@ public class AiModelMonitorListener implements ChatModelListener {
         // 注意：MonitorContextHolder 通常基于 ThreadLocal
         MonitorContext context = MonitorContextHolder.getContext();
 
-        String userId = context.getUserId();
-        String appId = context.getAppId();
-
         // 3. 【关键】将上下文快照存入 attributes，防止跨线程丢失
-        requestContext.attributes().put(MONITOR_CONTEXT_KEY, context);
+        if (context != null) {
+            requestContext.attributes().put(MONITOR_CONTEXT_KEY, context);
+        }
+
+        String userId = (context != null) ? context.getUserId() : "unknown";
+        String appId = (context != null) ? context.getAppId() : "unknown";
 
         // 4. 获取模型名称 (e.g., "gpt-4")
         String modelName = requestContext.chatRequest().modelName();
@@ -128,11 +130,11 @@ public class AiModelMonitorListener implements ChatModelListener {
     @Override
     public void onError(ChatModelErrorContext errorContext) {
 
-        // ⚠️ 优化建议：
-        // 当前代码直接调用 MonitorContextHolder.getContext()。
-        // 如果 onError 在异步线程触发，这里可能取不到值。
-        // 建议改为：MonitorContext context = (MonitorContext) errorContext.attributes().get(MONITOR_CONTEXT_KEY);
-        MonitorContext context = MonitorContextHolder.getContext();
+        // 1. 获取请求生命周期内的属性容器
+        Map<Object, Object> attributes = errorContext.attributes();
+
+        // 2. 【关键】从属性中恢复监控上下文
+        MonitorContext context = (MonitorContext) attributes.get(MONITOR_CONTEXT_KEY);
 
         String userId = (context != null) ? context.getUserId() : "unknown";
         String appId = (context != null) ? context.getAppId() : "unknown";
@@ -144,14 +146,13 @@ public class AiModelMonitorListener implements ChatModelListener {
         // ⚠️ 注意：ErrorMessage 可能包含动态内容，建议在 Collector 中进行归一化处理，防止 Tag 基数爆炸
         String errorMessage = errorContext.error().getMessage();
 
-        // 1. 埋点：记录请求失败
+        // 3. 埋点：记录请求失败
         aiModelMetricsCollector.recordRequest(userId, appId, modelName, "error");
 
-        // 2. 埋点：记录具体的错误原因
+        // 4. 埋点：记录具体的错误原因
         aiModelMetricsCollector.recordError(userId, appId, modelName, errorMessage);
 
-        // 3. 埋点：即使失败，也记录耗时（用于分析超时等问题）
-        Map<Object, Object> attributes = errorContext.attributes();
+        // 5. 埋点：即使失败，也记录耗时（用于分析超时等问题）
         recordResponseTime(attributes, userId, appId, modelName);
     }
 

@@ -29,7 +29,7 @@ public class StreamingChatModelConfig {
     private boolean logResponses;
 
     @Resource
-    private AiModelMonitorListener AiModelMonitorListener;
+    private AiModelMonitorListener aiModelMonitorListener;
 
     @Bean
     public StreamingChatModel streamingChatModelCustom() {
@@ -40,7 +40,7 @@ public class StreamingChatModelConfig {
                 .maxTokens(maxTokens)
                 .logRequests(logRequests)
                 .logResponses(logResponses)
-                .listeners(List.of(AiModelMonitorListener))
+                .listeners(List.of(aiModelMonitorListener))
                 .build();
     }
 }
