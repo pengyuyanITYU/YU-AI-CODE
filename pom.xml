@@ -134,11 +134,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>io.projectreactor</groupId>
-            <artifactId>reactor-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
             <version>5.8.38</version>
@@ -197,6 +192,13 @@
             <artifactId>java-diff-utils</artifactId>
             <version>4.12</version>
         </dependency>
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <version>3.5.0</version> <!-- 版本号根据实际需求调整 -->
+            <scope>test</scope>
+        </dependency>
+
 
     </dependencies>
 
