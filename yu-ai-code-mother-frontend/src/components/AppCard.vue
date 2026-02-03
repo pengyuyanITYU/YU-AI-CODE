@@ -22,9 +22,26 @@
         </div>
       </div>
       <div class="status-badge" v-if="!featured">
-        <a-tooltip :title="app.visualRange ? '已设置为公开' : '已设置为私有'">
-          <span class="status-dot" :class="{ 'status-dot--public': app.visualRange }"></span>
-        </a-tooltip>
+        <a-space direction="vertical" align="end" :size="4">
+          <a-tooltip :title="app.visualRange ? '已设置为公开' : '已设置为私有'">
+            <span class="status-dot" :class="{ 'status-dot--public': app.visualRange }"></span>
+          </a-tooltip>
+          <a-tag v-if="app.genStatus !== undefined && app.genStatus !== AppGenStatusEnum.GENERATED_SUCCESS" 
+                 :color="APP_GEN_STATUS_MAP[app.genStatus as AppGenStatusEnum]?.color"
+                 style="margin: 0; font-size: 10px; padding: 0 4px; line-height: 1.6;">
+            {{ APP_GEN_STATUS_MAP[app.genStatus as AppGenStatusEnum]?.text }}
+          </a-tag>
+          <a-tag v-if="app.deployStatus !== undefined && app.deployStatus !== AppDeployStatusEnum.NOT_DEPLOYED"
+                 :color="APP_DEPLOY_STATUS_MAP[app.deployStatus as AppDeployStatusEnum]?.color"
+                 style="margin: 0; font-size: 10px; padding: 0 4px; line-height: 1.6;">
+            {{ APP_DEPLOY_STATUS_MAP[app.deployStatus as AppDeployStatusEnum]?.text }}
+          </a-tag>
+          <a-tag v-if="app.featuredStatus !== undefined && app.featuredStatus !== AppFeaturedStatusEnum.NOT_APPLIED"
+                 :color="APP_FEATURED_STATUS_MAP[app.featuredStatus as AppFeaturedStatusEnum]?.color"
+                 style="margin: 0; font-size: 10px; padding: 0 4px; line-height: 1.6;">
+            {{ APP_FEATURED_STATUS_MAP[app.featuredStatus as AppFeaturedStatusEnum]?.text }}
+          </a-tag>
+        </a-space>
       </div>
     </div>
     <div class="app-info">
@@ -33,10 +50,13 @@
           {{ app.user?.userName?.charAt(0) || 'U' }}
         </a-avatar>
         <div class="app-meta">
-          <h3 class="app-title" :title="app.appName">{{ app.appName || '未命名应用' }}</h3>
+          <div class="app-title-row">
+            <h3 class="app-title" :title="app.appName">{{ app.appName || '未命名应用' }}</h3>
+            <PushpinOutlined v-if="app.userPriority && app.userPriority > 0" class="pin-icon" />
+          </div>
           <div class="app-author-row">
             <span class="app-author">{{ app.user?.userName || (featured ? '官方' : '未知用户') }}</span>
-            <span v-if="featured" class="featured-badge">精选</span>
+            <span v-if="featured || app.featuredStatus === AppFeaturedStatusEnum.FEATURED" class="featured-badge">精选</span>
           </div>
         </div>
       </div>
@@ -47,6 +67,20 @@
           </a-button>
           <template #overlay>
             <a-menu>
+              <a-menu-item key="pin" @click="handleTogglePin">
+                <template #icon>
+                  <VerticalAlignTopOutlined />
+                </template>
+                {{ app.userPriority && app.userPriority > 0 ? '取消置顶' : '置顶应用' }}
+              </a-menu-item>
+              <a-menu-item v-if="app.featuredStatus === AppFeaturedStatusEnum.NOT_APPLIED || app.featuredStatus === AppFeaturedStatusEnum.REJECTED" 
+                           key="apply" @click="handleApplyFeatured">
+                <template #icon>
+                  <StarOutlined />
+                </template>
+                申请精选
+              </a-menu-item>
+              <a-menu-divider />
               <a-menu-item key="toggle" @click="handleToggleVisualRange">
                 <template #icon>
                   <GlobalOutlined v-if="!app.visualRange" />
@@ -77,8 +111,12 @@ import {
   MoreOutlined,
   GlobalOutlined,
   LockOutlined,
-  DeleteOutlined
+  DeleteOutlined,
+  StarOutlined,
+  PushpinOutlined,
+  VerticalAlignTopOutlined
 } from '@ant-design/icons-vue'
+import { AppDeployStatusEnum, APP_DEPLOY_STATUS_MAP, AppGenStatusEnum, APP_GEN_STATUS_MAP, AppFeaturedStatusEnum, APP_FEATURED_STATUS_MAP } from '@/utils/appStatus'
 
 interface Props {
   app: API.AppVO
@@ -90,6 +128,8 @@ interface Emits {
   (e: 'view-work', app: API.AppVO): void
   (e: 'toggle-visual-range', app: API.AppVO): void
   (e: 'delete-app', app: API.AppVO): void
+  (e: 'apply-featured', app: API.AppVO): void
+  (e: 'toggle-pin', app: API.AppVO): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -115,6 +155,14 @@ const handleEdit = () => {
 
 const handleToggleVisualRange = () => {
   emit('toggle-visual-range', props.app)
+}
+
+const handleApplyFeatured = () => {
+  emit('apply-featured', props.app)
+}
+
+const handleTogglePin = () => {
+  emit('toggle-pin', props.app)
 }
 
 const showDeleteConfirm = () => {
@@ -258,15 +306,29 @@ const showDeleteConfirm = () => {
   min-width: 0;
 }
 
+.app-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.pin-icon {
+  color: #3b82f6;
+  font-size: 14px;
+  transform: rotate(45deg);
+}
+
 .app-title {
   font-size: 15px;
   font-weight: 600;
-  margin: 0 0 4px 0;
+  margin: 0;
   color: rgba(255, 255, 255, 0.98);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  flex: 1;
 }
 
 .app-author-row {

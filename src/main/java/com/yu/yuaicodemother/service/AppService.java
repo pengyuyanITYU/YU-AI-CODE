@@ -24,10 +24,37 @@ public interface AppService extends IService<App> {
 
     QueryWrapper getQueryWrapper(AppQueryRequest appQueryRequest);
 
+    /**
+     * 申请精选
+     *
+     * @param appId
+     * @param loginUser
+     * @return
+     */
+    boolean applyForFeatured(Long appId, User loginUser);
+
+    /**
+     * 更新用户个人优先级
+     *
+     * @param appId
+     * @param userPriority
+     * @param loginUser
+     * @return
+     */
+    boolean updateMyPriority(Long appId, Integer userPriority, User loginUser);
+
     List<AppVO> getAppVOList(List<App> appList);
 
     Flux<String> chatToGenCode(Long appId, String message, User loginUser);
 
+    /**
+     * 部署应用（上线）
+     * 整合了初次部署和重新上线的逻辑
+     *
+     * @param appId 应用ID
+     * @param loginUser 登录用户
+     * @return 部署URL
+     */
     String deployApp(Long appId, User loginUser);
 
     boolean removeById(Serializable id);
@@ -36,4 +63,18 @@ public interface AppService extends IService<App> {
 
     Long createApp(AppAddRequest appAddRequest, User loginUser);
 
+    /**
+     * 下线应用
+     *
+     * @param appId 应用ID
+     */
+    void offlineApp(Long appId);
+
+    /**
+     * 更新应用生成状态
+     *
+     * @param appId 应用ID
+     * @param genStatus 生成状态（0=未开始，1=生成中，2=生成成功，3=生成失败）
+     */
+    void updateGenStatus(Long appId, Integer genStatus);
 }

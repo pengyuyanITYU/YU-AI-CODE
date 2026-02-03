@@ -112,6 +112,30 @@ public class App implements Serializable {
     private Integer currentVersion;
 
     /**
+     * 部署状态（0=未部署，1=已上线，2=已下线）
+     */
+    @Column("deploy_status")
+    private Integer deployStatus;
+
+    /**
+     * 生成状态（0=未开始，1=生成中，2=生成成功，3=生成失败）
+     */
+    @Column("gen_status")
+    private Integer genStatus;
+
+    /**
+     * 精选状态：0-未申请, 1-申请中, 2-已精选, 3-已拒绝
+     */
+    @Column("featured_status")
+    private Integer featuredStatus;
+
+    /**
+     * 用户个人优先级
+     */
+    @Column("user_priority")
+    private Integer userPriority;
+
+    /**
      * 是否删除
      */
     @Column(value = "isDelete", isLogicDelete = true)

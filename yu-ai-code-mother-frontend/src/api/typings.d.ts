@@ -8,6 +8,7 @@ declare namespace API {
     appName?: string
     cover?: string
     priority?: number
+    featuredStatus?: number
   }
 
   type AppDeployRequest = {
@@ -26,6 +27,7 @@ declare namespace API {
     codeGenType?: string
     deployKey?: string
     priority?: number
+    featuredStatus?: number
     userId?: number
   }
 
@@ -43,13 +45,33 @@ declare namespace API {
     deployKey?: string
     deployedTime?: string
     priority?: number
+    featuredStatus?: number
+    userPriority?: number
     userId?: number
     currentVersion?: number
+    deployStatus?: number
+    genStatus?: number
     createTime?: string
     updateTime?: string
     user?: UserVO
     visualRange: boolean
   }
+
+  type AppDeployControlRequest = {
+    appId?: number
+    deployStatus?: number
+  }
+
+  type BaseResponseInt = {
+    code?: number
+    data?: number
+    message?: string
+  }
+
+  type getGenStatusParams = {
+    appId: number
+  }
+
 
   type BaseResponseAppVO = {
     code?: number
@@ -151,6 +173,15 @@ declare namespace API {
   type updateAppVisualRangeParams = {
     appId: number
     visualRange: boolean
+  }
+
+  type applyForFeaturedParams = {
+    appId: number
+  }
+
+  type updateMyPriorityParams = {
+    appId: number
+    userPriority: number
   }
 
   type getAppVOByIdByAdminParams = {

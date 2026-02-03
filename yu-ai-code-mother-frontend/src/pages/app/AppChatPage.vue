@@ -35,12 +35,33 @@
           </template>
           下载代码
         </a-button>
-        <a-button type="primary" @click="deployApp" :loading="deploying">
-          <template #icon>
-            <CloudUploadOutlined />
-          </template>
-          部署
-        </a-button>
+
+        <!-- 部署控制：如果是 ONLINE，显示下线；否则显示部署 -->
+        <template v-if="isOwner">
+            <a-button 
+                v-if="appInfo?.deployStatus === AppDeployStatusEnum.ONLINE"
+                type="primary" 
+                danger
+                @click="handleToggleDeploy(AppDeployStatusEnum.OFFLINE)" 
+                :loading="deploying"
+            >
+              <template #icon>
+                <CloudDownloadOutlined />
+              </template>
+              下线
+            </a-button>
+            <a-button 
+                v-else
+                type="primary" 
+                @click="handleToggleDeploy(AppDeployStatusEnum.ONLINE)" 
+                :loading="deploying"
+            >
+              <template #icon>
+                <CloudUploadOutlined />
+              </template>
+              部署
+            </a-button>
+        </template>
       </div>
     </div>
 
@@ -228,6 +249,7 @@
         :show-actions="isOwner || isAdmin"
         @edit="editApp"
         @delete="deleteApp"
+        @refresh="fetchAppInfo"
     />
 
     <!-- 部署成功弹窗 -->
@@ -254,12 +276,13 @@ import { message } from 'ant-design-vue'
 import { useLoginUserStore } from '@/stores/loginUser'
 import {
   getAppVoById,
-  deployApp as deployAppApi,
   deleteApp as deleteAppApi,
+  controlDeploy,
 } from '@/api/appController'
 import { listVersions, rollbackVersion } from '@/api/appVersionController'
 import { listAppChatHistory } from '@/api/chatHistoryController'
 import { CodeGenTypeEnum, formatCodeGenType } from '@/utils/codeGenTypes'
+import { AppDeployStatusEnum } from '@/utils/appStatus'
 import request from '@/request'
 
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
@@ -272,6 +295,7 @@ import { VisualEditor, type ElementInfo } from '@/utils/visualEditor'
 
 import {
   CloudUploadOutlined,
+  CloudDownloadOutlined,
   SendOutlined,
   ExportOutlined,
   InfoCircleOutlined,
@@ -763,29 +787,35 @@ const downloadCode = async () => {
   }
 }
 
-// 部署应用
-const deployApp = async () => {
-  if (!appId.value) {
-    message.error('应用ID不存在')
-    return
-  }
-
+// 切换部署状态（上线/下线）
+const handleToggleDeploy = async (status: AppDeployStatusEnum) => {
+  if (!appId.value) return
   deploying.value = true
   try {
-    const res = await deployAppApi({
-      appId: appId.value as unknown as number,
+    const res = await controlDeploy({
+      appId: appId.value,
+      deployStatus: status,
     })
-
-    if (res.data.code === 0 && res.data.data) {
-      deployUrl.value = res.data.data
-      deployModalVisible.value = true
-      message.success('部署成功')
+    if (res.data.code === 0) {
+      message.success(status === AppDeployStatusEnum.ONLINE ? '已上线' : '已下线')
+      if (status === AppDeployStatusEnum.ONLINE && res.data.data) {
+        deployUrl.value = res.data.data
+        deployModalVisible.value = true
+      }
+      await fetchAppInfo()
+      if (status === AppDeployStatusEnum.ONLINE) {
+        updatePreview()
+      } else {
+        // 下线后，清除预览地址（虽然 Owner 可以看，但在按钮操作后建议清空一下触发重新渲染或保持 UI 逻辑一致）
+        // 如果想让 Owner 继续看预览，可以不置空，StaticResourceController 会放行
+        // 这里建议保持 previewUrl 不变，因为 StaticResourceController 已经处理了 Owner 预览权限
+      }
     } else {
-      message.error('部署失败：' + res.data.message)
+      message.error('操作失败：' + res.data.message)
     }
-  } catch (error) {
-    console.error('部署失败：', error)
-    message.error('部署失败，请重试')
+  } catch (e) {
+    console.error('操作失败', e)
+    message.error('操作失败')
   } finally {
     deploying.value = false
   }

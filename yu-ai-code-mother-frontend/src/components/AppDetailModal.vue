@@ -18,6 +18,39 @@
           </a-tag>
           <span v-else>未知类型</span>
         </div>
+        <div class="info-item" v-if="app?.genStatus !== undefined">
+          <span class="info-label">生成状态：</span>
+          <a-tag :color="APP_GEN_STATUS_MAP[app.genStatus as AppGenStatusEnum]?.color">
+            {{ APP_GEN_STATUS_MAP[app.genStatus as AppGenStatusEnum]?.text }}
+          </a-tag>
+        </div>
+        <div class="info-item" v-if="app?.deployStatus !== undefined">
+          <span class="info-label">部署状态：</span>
+          <a-tag :color="APP_DEPLOY_STATUS_MAP[app.deployStatus as AppDeployStatusEnum]?.color">
+            {{ APP_DEPLOY_STATUS_MAP[app.deployStatus as AppDeployStatusEnum]?.text }}
+          </a-tag>
+          <a-space v-if="showActions && app?.deployKey" style="margin-left: 8px">
+            <a-button 
+              v-if="app.deployStatus === AppDeployStatusEnum.OFFLINE" 
+              size="small" 
+              type="link" 
+              :loading="deployControlLoading"
+              @click="handleControlDeploy(AppDeployStatusEnum.ONLINE)"
+            >
+              上线
+            </a-button>
+            <a-button 
+              v-if="app.deployStatus === AppDeployStatusEnum.ONLINE" 
+              size="small" 
+              type="link" 
+              danger 
+              :loading="deployControlLoading"
+              @click="handleControlDeploy(AppDeployStatusEnum.OFFLINE)"
+            >
+              下线
+            </a-button>
+          </a-space>
+        </div>
       </div>
 
       <!-- 操作栏（仅本人或管理员可见） -->
@@ -49,11 +82,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import UserInfo from './UserInfo.vue'
 import { formatTime } from '@/utils/time'
 import {formatCodeGenType} from "../utils/codeGenTypes.ts";
+import { AppDeployStatusEnum, APP_DEPLOY_STATUS_MAP, AppGenStatusEnum, APP_GEN_STATUS_MAP } from '@/utils/appStatus'
+import { controlDeploy } from '@/api/appController'
+import { message } from 'ant-design-vue'
 
 interface Props {
   open: boolean
@@ -65,6 +101,7 @@ interface Emits {
   (e: 'update:open', value: boolean): void
   (e: 'edit'): void
   (e: 'delete'): void
+  (e: 'refresh'): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -72,6 +109,8 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<Emits>()
+
+const deployControlLoading = ref(false)
 
 const visible = computed({
   get: () => props.open,
@@ -84,6 +123,28 @@ const handleEdit = () => {
 
 const handleDelete = () => {
   emit('delete')
+}
+
+const handleControlDeploy = async (status: AppDeployStatusEnum) => {
+  if (!props.app?.id) return
+  deployControlLoading.value = true
+  try {
+    const res = await controlDeploy({
+      appId: props.app.id,
+      deployStatus: status,
+    })
+    if (res.data.code === 0) {
+      message.success(status === AppDeployStatusEnum.ONLINE ? '已上线' : '已下线')
+      emit('refresh')
+    } else {
+      message.error('操作失败：' + res.data.message)
+    }
+  } catch (e) {
+    console.error('操作失败', e)
+    message.error('操作失败')
+  } finally {
+    deployControlLoading.value = false
+  }
 }
 </script>
 

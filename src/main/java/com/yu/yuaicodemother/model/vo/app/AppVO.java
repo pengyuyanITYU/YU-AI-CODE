@@ -75,6 +75,26 @@ public class AppVO implements Serializable {
      */
     private boolean visualRange;
 
+    /**
+     * 部署状态（0=未部署，1=已上线，2=已下线）
+     */
+    private Integer deployStatus;
+
+    /**
+     * 生成状态（0=未开始，1=生成中，2=生成成功，3=生成失败）
+     */
+    private Integer genStatus;
+
+    /**
+     * 精选状态
+     */
+    private Integer featuredStatus;
+
+    /**
+     * 用户个人优先级
+     */
+    private Integer userPriority;
+
     @Serial
     private static final long serialVersionUID = 1L;
 }

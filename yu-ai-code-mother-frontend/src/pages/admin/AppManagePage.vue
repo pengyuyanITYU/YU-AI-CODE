@@ -24,6 +24,22 @@
           </a-select-option>
         </a-select>
       </a-form-item>
+      <a-form-item label="精选状态">
+        <a-select
+          v-model:value="searchParams.featuredStatus"
+          placeholder="选择状态"
+          style="width: 120px"
+        >
+          <a-select-option :value="undefined">全部</a-select-option>
+          <a-select-option
+            v-for="(value, key) in APP_FEATURED_STATUS_MAP"
+            :key="key"
+            :value="Number(key)"
+          >
+            {{ value.text }}
+          </a-select-option>
+        </a-select>
+      </a-form-item>
       <a-form-item>
         <a-button type="primary" html-type="submit">搜索</a-button>
       </a-form-item>
@@ -52,8 +68,28 @@
           {{ formatCodeGenType(record.codeGenType) }}
         </template>
         <template v-else-if="column.dataIndex === 'priority'">
-          <a-tag v-if="record.priority === 99" color="gold">精选</a-tag>
-          <span v-else>{{ record.priority || 0 }}</span>
+          <a-input-number 
+            v-model:value="record.priority" 
+            :min="0" 
+            :max="999" 
+            size="small" 
+            @change="(val: number) => updatePriority(record, val)"
+          />
+        </template>
+        <template v-else-if="column.dataIndex === 'featuredStatus'">
+          <a-tag :color="APP_FEATURED_STATUS_MAP[record.featuredStatus as AppFeaturedStatusEnum]?.color">
+            {{ APP_FEATURED_STATUS_MAP[record.featuredStatus as AppFeaturedStatusEnum]?.text }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.dataIndex === 'genStatus'">
+          <a-tag :color="APP_GEN_STATUS_MAP[record.genStatus as AppGenStatusEnum]?.color">
+            {{ APP_GEN_STATUS_MAP[record.genStatus as AppGenStatusEnum]?.text }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.dataIndex === 'deployStatus'">
+          <a-tag :color="APP_DEPLOY_STATUS_MAP[record.deployStatus as AppDeployStatusEnum]?.color">
+            {{ APP_DEPLOY_STATUS_MAP[record.deployStatus as AppDeployStatusEnum]?.text }}
+          </a-tag>
         </template>
         <template v-else-if="column.dataIndex === 'deployedTime'">
           <span v-if="record.deployedTime">
@@ -69,17 +105,25 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a-button type="primary" size="small" @click="editApp(record)"> 编辑 </a-button>
-            <a-button
-              type="default"
-              size="small"
-              @click="toggleFeatured(record)"
-              :class="{ 'featured-btn': record.priority === 99 }"
-            >
-              {{ record.priority === 99 ? '取消精选' : '精选' }}
-            </a-button>
+            <a-button type="link" size="small" @click="editApp(record)"> 编辑 </a-button>
+            <a-dropdown>
+              <a-button type="link" size="small"> 审核 <DownOutlined /></a-button>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item @click="doReview(record, AppFeaturedStatusEnum.FEATURED)">
+                    通过精选
+                  </a-menu-item>
+                  <a-menu-item @click="doReview(record, AppFeaturedStatusEnum.REJECTED)" danger>
+                    拒绝申请
+                  </a-menu-item>
+                  <a-menu-item @click="doReview(record, AppFeaturedStatusEnum.NOT_APPLIED)">
+                    重置状态
+                  </a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
             <a-popconfirm title="确定要删除这个应用吗？" @confirm="deleteApp(record.id)">
-              <a-button danger size="small">删除</a-button>
+              <a-button type="link" danger size="small">删除</a-button>
             </a-popconfirm>
           </a-space>
         </template>
@@ -92,9 +136,18 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { DownOutlined } from '@ant-design/icons-vue'
 import { listAppVoByPageByAdmin, deleteAppByAdmin, updateAppByAdmin } from '@/api/appController'
 import { CODE_GEN_TYPE_OPTIONS, formatCodeGenType } from '@/utils/codeGenTypes'
 import { formatTime } from '@/utils/time'
+import { 
+  AppDeployStatusEnum, 
+  APP_DEPLOY_STATUS_MAP, 
+  AppGenStatusEnum, 
+  APP_GEN_STATUS_MAP,
+  AppFeaturedStatusEnum,
+  APP_FEATURED_STATUS_MAP
+} from '@/utils/appStatus'
 import UserInfo from '@/components/UserInfo.vue'
 
 const router = useRouter()
@@ -130,6 +183,21 @@ const columns = [
     title: '优先级',
     dataIndex: 'priority',
     width: 80,
+  },
+  {
+    title: '精选状态',
+    dataIndex: 'featuredStatus',
+    width: 100,
+  },
+  {
+    title: '生成状态',
+    dataIndex: 'genStatus',
+    width: 100,
+  },
+  {
+    title: '部署状态',
+    dataIndex: 'deployStatus',
+    width: 100,
   },
   {
     title: '部署时间',
@@ -217,27 +285,46 @@ const editApp = (app: API.AppVO) => {
   router.push(`/app/edit/${app.id}`)
 }
 
-// 切换精选状态
-const toggleFeatured = async (app: API.AppVO) => {
+// 审核精选状态
+const doReview = async (app: API.AppVO, status: number) => {
   if (!app.id) return
-
-  const newPriority = app.priority === 99 ? 0 : 99
 
   try {
     const res = await updateAppByAdmin({
       id: app.id,
-      priority: newPriority,
+      featuredStatus: status,
     })
 
     if (res.data.code === 0) {
-      message.success(newPriority === 99 ? '已设为精选' : '已取消精选')
-      // 刷新数据
+      message.success('操作成功')
       fetchData()
     } else {
       message.error('操作失败：' + res.data.message)
     }
   } catch (error) {
     console.error('操作失败：', error)
+    message.error('操作失败')
+  }
+}
+
+// 更新全局优先级
+const updatePriority = async (app: API.AppVO, priority: number) => {
+  if (!app.id) return
+
+  try {
+    const res = await updateAppByAdmin({
+      id: app.id,
+      priority,
+    })
+
+    if (res.data.code === 0) {
+      message.success('优先级已更新')
+      fetchData()
+    } else {
+      message.error('更新失败：' + res.data.message)
+    }
+  } catch (error) {
+    console.error('更新优先级失败：', error)
     message.error('操作失败')
   }
 }

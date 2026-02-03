@@ -22,6 +22,9 @@ import com.yu.yuaicodemother.model.dto.app.AppAddRequest;
 import com.yu.yuaicodemother.model.dto.app.AppQueryRequest;
 import com.yu.yuaicodemother.model.entity.App;
 import com.yu.yuaicodemother.model.entity.User;
+import com.yu.yuaicodemother.model.enums.AppDeployStatusEnum;
+import com.yu.yuaicodemother.model.enums.AppFeaturedStatusEnum;
+import com.yu.yuaicodemother.model.enums.AppGenStatusEnum;
 import com.yu.yuaicodemother.model.enums.ChatHistoryMessageTypeEnum;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
 import com.yu.yuaicodemother.model.vo.app.AppVO;
@@ -49,7 +52,7 @@ import java.util.stream.Collectors;
 
 /**
  * 应用 服务层实现。
- * 
+ *
  * @author 鱼🐟
  */
 @Slf4j
@@ -90,6 +93,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         BeanUtil.copyProperties(appAddRequest, app);
         app.setUserId(loginUser.getId());
         app.setVisualRange(true);
+        // 初始化状态
+        app.setDeployStatus(AppDeployStatusEnum.NOT_DEPLOYED.getValue());
+        app.setGenStatus(AppGenStatusEnum.NOT_STARTED.getValue());
         String appName = null;
         try {
             appName = aiCodeGenerateAppNameService.generateAppName(initPrompt);
@@ -139,11 +145,22 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 .appId(appId.toString())
                 .userId(loginUser.getId().toString())
                 .build());
-        // 6. 调用 AI 生成代码（流式）
+        // 6. 更新生成状态为"生成中"
+        updateGenStatus(appId, AppGenStatusEnum.GENERATING.getValue());
+        // 7. 调用 AI 生成代码（流式）
         Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
-        // 7. 收集AI响应内容并在完成后记录到对话历史
+        // 8. 收集AI响应内容并在完成后记录到对话历史
         Flux<String> result = streamHandlerExecutor
                 .doExecute(contentFlux, chatHistoryService, appId, loginUser, codeGenTypeEnum)
+                .doOnComplete(() -> {
+                    // 流正常完成，更新状态为生成成功
+                    updateGenStatus(appId, AppGenStatusEnum.GENERATED_SUCCESS.getValue());
+                })
+                .doOnError(error -> {
+                    // 流发生错误，更新状态为生成失败
+                    log.error("应用生成失败: {}", error.getMessage());
+                    updateGenStatus(appId, AppGenStatusEnum.GENERATED_FAILED.getValue());
+                })
                 .doFinally(signalType ->
                 // 流结束后清理 无论成功/失败/取消
                 MonitorContextHolder.clearContext());
@@ -216,8 +233,13 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         // 4. 检查是否已有 deployKey
         String deployKey = app.getDeployKey();
-        // 没有则生成 6 位 deployKey（大小写字母 + 数字）
+        // 第一次部署逻辑
         if (StrUtil.isBlank(deployKey)) {
+            // 如果第一次部署但状态已经是上线，报错（数据异常）
+            if (Integer.valueOf(AppDeployStatusEnum.ONLINE.getValue()).equals(app.getDeployStatus())) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "应用部署状态异常，请联系管理员");
+            }
+            // 生成 6 位 deployKey（大小写字母 + 数字）
             deployKey = RandomUtil.randomString(6);
         }
         // 5. 获取代码生成类型，构建源目录路径
@@ -249,20 +271,98 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         } catch (Exception e) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "部署失败：" + e.getMessage());
         }
-        // 9. 更新应用的 deployKey 和部署时间
+        // 9. 更新应用的 deployKey、部署时间和部署状态
         App updateApp = new App();
         updateApp.setId(appId);
         updateApp.setDeployKey(deployKey);
         updateApp.setDeployedTime(LocalDateTime.now());
+        updateApp.setDeployStatus(AppDeployStatusEnum.ONLINE.getValue());
         boolean updateResult = this.updateById(updateApp);
         ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用部署信息失败");
         // 10. 返回可访问的 URL
-        // 10. 构建应用访问 URL
         String appDeployUrl = String.format("%s/%s/", AppConstant.CODE_DEPLOY_HOST, deployKey);
         // 11. 异步生成截图并更新应用封面
         generateAppScreenshotAsync(appId, appDeployUrl);
         return appDeployUrl;
+    }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void offlineApp(Long appId) {
+        // 1. 查询应用信息
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        String deployKey = app.getDeployKey();
+        // 如果没有部署过，无需下线
+        if (StrUtil.isBlank(deployKey)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "应用未部署，无需下线");
+        }
+
+        // 2. 更新应用状态为"已下线"（先改状态，确保即使文件删除失败，访问也会被拦截）
+        App updateApp = new App();
+        updateApp.setId(appId);
+        updateApp.setDeployStatus(AppDeployStatusEnum.OFFLINE.getValue());
+        boolean updateResult = this.updateById(updateApp);
+        ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用状态失败");
+
+        // 3. 尝试删除部署目录（下线）
+        String deployDirPath = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
+        try {
+            File deployDir = new File(deployDirPath);
+            if (deployDir.exists()) {
+                FileUtil.del(deployDir);
+                log.info("应用已下线，删除部署目录: {}", deployDirPath);
+            }
+        } catch (Exception e) {
+            // 记录日志但不影响数据库状态变更的完成
+            log.error("下线应用时删除部署目录失败 (appId: {}): {}", appId, e.getMessage());
+        }
+    }
+
+    @Override
+    public void updateGenStatus(Long appId, Integer genStatus) {
+        if (appId == null || appId <= 0 || genStatus == null) {
+            return;
+        }
+        App updateApp = new App();
+        updateApp.setId(appId);
+        updateApp.setGenStatus(genStatus);
+        this.updateById(updateApp);
+    }
+
+    @Override
+    public boolean applyForFeatured(Long appId, User loginUser) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR);
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
+        // 仅本人可申请
+        if (!app.getUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        // 已经是申请中或已精选，不处理
+        if (AppFeaturedStatusEnum.PENDING.getValue() == app.getFeaturedStatus()
+                || AppFeaturedStatusEnum.FEATURED.getValue() == app.getFeaturedStatus()) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "已在申请中或已精选");
+        }
+        App updateApp = new App();
+        updateApp.setId(appId);
+        updateApp.setFeaturedStatus(AppFeaturedStatusEnum.PENDING.getValue());
+        return this.updateById(updateApp);
+    }
+
+    @Override
+    public boolean updateMyPriority(Long appId, Integer userPriority, User loginUser) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR);
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
+        // 仅本人可更新个人优先级
+        if (!app.getUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        App updateApp = new App();
+        updateApp.setId(appId);
+        updateApp.setUserPriority(userPriority);
+        return this.updateById(updateApp);
     }
 
     /**
@@ -315,10 +415,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         String codeGenType = appQueryRequest.getCodeGenType();
         String deployKey = appQueryRequest.getDeployKey();
         Integer priority = appQueryRequest.getPriority();
+        Integer featuredStatus = appQueryRequest.getFeaturedStatus();
         Long userId = appQueryRequest.getUserId();
         String sortField = appQueryRequest.getSortField();
         String sortOrder = appQueryRequest.getSortOrder();
-        return QueryWrapper.create()
+        QueryWrapper queryWrapper = QueryWrapper.create()
                 .eq("id", id)
                 .like("appName", appName)
                 .like("cover", cover)
@@ -326,8 +427,25 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                 .eq("codeGenType", codeGenType)
                 .eq("deployKey", deployKey)
                 .eq("priority", priority)
-                .eq("userId", userId)
-                .orderBy(sortField, "ascend".equals(sortOrder));
+                .eq("featured_status", featuredStatus)
+                .eq("userId", userId);
+
+        // 设置排序
+        if (StrUtil.isNotBlank(sortField)) {
+            queryWrapper.orderBy(sortField, "ascend".equals(sortOrder));
+        } else {
+            // 默认排序
+            if (userId != null) {
+                // 个人工作台：用户优先级 -> 创建时间
+                queryWrapper.orderBy("user_priority", false);
+                queryWrapper.orderBy("createTime", false);
+            } else {
+                // 公共列表/精选列表：全局优先级 -> 创建时间
+                queryWrapper.orderBy("priority", false);
+                queryWrapper.orderBy("createTime", false);
+            }
+        }
+        return queryWrapper;
     }
 
     @Override
@@ -348,5 +466,4 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             return appVO;
         }).collect(Collectors.toList());
     }
-
 }

@@ -17,6 +17,8 @@ import com.yu.yuaicodemother.exception.ThrowUtils;
 import com.yu.yuaicodemother.model.dto.app.*;
 import com.yu.yuaicodemother.model.entity.App;
 import com.yu.yuaicodemother.model.entity.User;
+import com.yu.yuaicodemother.model.enums.AppDeployStatusEnum;
+import com.yu.yuaicodemother.model.enums.AppFeaturedStatusEnum;
 import com.yu.yuaicodemother.model.vo.app.AppVO;
 import com.yu.yuaicodemother.ratelimit.annotation.RateLimit;
 import com.yu.yuaicodemother.ratelimit.enums.RateLimitType;
@@ -147,27 +149,55 @@ public class AppController {
     }
 
 
-
     /**
-     * 应用部署
+     * 应用部署控制（上线/下线）
+     * 整合了初次部署、重新部署和上线/下线的逻辑
      *
-     * @param appDeployRequest 部署请求
-     * @param request          请求
-     * @return 部署 URL
+     * @param appDeployControlRequest 部署控制请求
+     * @param request                 请求
+     * @return 操作结果（上线时返回部署URL）
      */
-    @PostMapping("/deploy")
-    public BaseResponse<String> deployApp(@RequestBody AppDeployRequest appDeployRequest, HttpServletRequest request) {
-        ThrowUtils.throwIf(appDeployRequest == null, ErrorCode.PARAMS_ERROR);
-        Long appId = appDeployRequest.getAppId();
+    @PostMapping("/deploy/control")
+    public BaseResponse<String> controlDeploy(@RequestBody AppDeployControlRequest appDeployControlRequest,
+                                              HttpServletRequest request) {
+        ThrowUtils.throwIf(appDeployControlRequest == null, ErrorCode.PARAMS_ERROR);
+        Long appId = appDeployControlRequest.getAppId();
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        Integer deployStatus = appDeployControlRequest.getDeployStatus();
+        ThrowUtils.throwIf(deployStatus == null, ErrorCode.PARAMS_ERROR, "部署状态不能为空");
+
         // 获取当前登录用户
         User loginUser = userService.getLoginUser(request);
-        // 调用服务部署应用
-        String deployUrl = appService.deployApp(appId, loginUser);
-        return ResultUtils.success(deployUrl);
+        String result;
+
+        if (deployStatus == AppDeployStatusEnum.ONLINE.getValue()) {
+            // 上线操作（包括初次上线、下线后上线、重新部署）
+            result = appService.deployApp(appId, loginUser);
+        } else if (deployStatus == AppDeployStatusEnum.OFFLINE.getValue()) {
+            // 下线操作
+            appService.offlineApp(appId);
+            result = "应用已下线";
+        } else {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "无效的部署状态");
+        }
+
+        return ResultUtils.success(result);
     }
 
-
+    /**
+     * 查询应用生成状态
+     *
+     * @param appId 应用ID
+     * @return 生成状态
+     */
+    @GetMapping("/gen-status/{appId}")
+    public BaseResponse<Integer> getGenStatus(@PathVariable Long appId) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        Integer genStatus = app.getGenStatus();
+        return ResultUtils.success(genStatus);
+    }
 
     /**
      * 更新应用（用户只能更新自己的应用名称）
@@ -280,8 +310,8 @@ public class AppController {
         long pageSize = appQueryRequest.getPageSize();
         ThrowUtils.throwIf(pageSize > 20, ErrorCode.PARAMS_ERROR, "每页最多查询 20 个应用");
         long pageNum = appQueryRequest.getPageNum();
-        // 只查询精选的应用
-        appQueryRequest.setPriority(AppConstant.GOOD_APP_PRIORITY);
+        // 只查询已精选的应用
+        appQueryRequest.setFeaturedStatus(AppFeaturedStatusEnum.FEATURED.getValue());
         QueryWrapper queryWrapper = appService.getQueryWrapper(appQueryRequest);
         User LoginUser = userService.getLoginUser(request);
         Long userId = LoginUser == null ? -1 : LoginUser.getId();
@@ -302,6 +332,37 @@ public class AppController {
         List<AppVO> appVOList = appService.getAppVOList(appPage.getRecords());
         appVOPage.setRecords(appVOList);
         return ResultUtils.success(appVOPage);
+    }
+
+    /**
+     * 申请精选
+     *
+     * @param appId   应用 id
+     * @param request 请求
+     * @return 结果
+     */
+    @PostMapping("/apply/featured")
+    public BaseResponse<Boolean> applyForFeatured(@RequestParam Long appId, HttpServletRequest request) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        boolean result = appService.applyForFeatured(appId, loginUser);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 更新个人优先级
+     *
+     * @param appId        应用 id
+     * @param userPriority 个人优先级
+     * @param request      请求
+     * @return 结果
+     */
+    @PostMapping("/update/my_priority")
+    public BaseResponse<Boolean> updateMyPriority(@RequestParam Long appId, @RequestParam Integer userPriority, HttpServletRequest request) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        boolean result = appService.updateMyPriority(appId, userPriority, loginUser);
+        return ResultUtils.success(result);
     }
 
     /**
@@ -401,11 +462,3 @@ public class AppController {
     }
 
     }
-
-
-
-
-
-
-
-

@@ -98,18 +98,6 @@ export async function deleteApp(body: API.DeleteRequest, options?: { [key: strin
   })
 }
 
-/** 此处后端没有提供注释 POST /app/deploy */
-export async function deployApp(body: API.AppDeployRequest, options?: { [key: string]: any }) {
-  return request<API.BaseResponseString>('/app/deploy', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    data: body,
-    ...(options || {}),
-  })
-}
-
 /** 此处后端没有提供注释 GET /app/download/${param0} */
 export async function downloadAppCode(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
@@ -181,7 +169,7 @@ export async function updateApp(body: API.AppUpdateRequest, options?: { [key: st
   })
 }
 
-/** 更改应用的可见范围 POST /app/visualRange/{appId} */
+/** 更改应用的可见范围 POST /app/visualRange/${param0} */
 export async function updateAppVisualRange(
   params: API.updateAppVisualRangeParams,
   options?: { [key: string]: any }
@@ -193,6 +181,59 @@ export async function updateAppVisualRange(
       'Content-Type': 'application/json',
     },
     params: { ...queryParams },
+    ...(options || {}),
+  })
+}
+
+/** 应用部署控制（上线/下线） POST /app/deploy/control */
+export async function controlDeploy(body: API.AppDeployControlRequest, options?: { [key: string]: any }) {
+  return request<API.BaseResponseString>('/app/deploy/control', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
+
+/** 查询应用生成状态 GET /app/gen-status/${param0} */
+export async function getGenStatus(
+  params: API.getGenStatusParams,
+  options?: { [key: string]: any }
+) {
+  const { appId: param0, ...queryParams } = params
+  return request<API.BaseResponseInt>(`/app/gen-status/${param0}`, {
+    method: 'GET',
+    params: { ...queryParams },
+    ...(options || {}),
+  })
+}
+
+/** 申请精选 POST /app/apply/featured */
+export async function applyForFeatured(
+  params: API.applyForFeaturedParams,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseBoolean>('/app/apply/featured', {
+    method: 'POST',
+    params: {
+      ...params,
+    },
+    ...(options || {}),
+  })
+}
+
+/** 更新个人优先级 POST /app/update/my_priority */
+export async function updateMyPriority(
+  params: API.updateMyPriorityParams,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseBoolean>('/app/update/my_priority', {
+    method: 'POST',
+    params: {
+      ...params,
+    },
     ...(options || {}),
   })
 }

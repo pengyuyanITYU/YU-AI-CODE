@@ -82,3 +82,20 @@ CREATE TABLE app_versions (
                               createTime  DATETIME DEFAULT CURRENT_TIMESTAMP,
                               INDEX idx_app_version (app_id, version)
 );
+
+-- 2026-02-02: 应用状态管理扩展
+-- 添加部署状态字段（0=未部署，1=已上线，2=已下线）
+ALTER TABLE app ADD COLUMN deploy_status INT DEFAULT 0 COMMENT '部署状态：0-未部署，1-已上线，2-已下线';
+
+-- 添加生成状态字段（0=未开始，1=生成中，2=生成成功，3=生成失败）
+ALTER TABLE app ADD COLUMN gen_status INT DEFAULT 0 COMMENT '生成状态：0-未开始，1-生成中，2-生成成功，3-生成失败';
+
+-- 添加索引优化查询性能
+CREATE INDEX idx_deploy_status ON app(deploy_status);
+CREATE INDEX idx_gen_status ON app(gen_status);
+
+-- 精选与置顶功能扩展
+ALTER TABLE app ADD COLUMN featured_status INT DEFAULT 0 COMMENT '精选状态：0-未申请, 1-申请中, 2-已精选, 3-已拒绝';
+ALTER TABLE app ADD COLUMN user_priority INT DEFAULT 0 COMMENT '用户个人优先级';
+CREATE INDEX idx_featured_status ON app(featured_status);
+CREATE INDEX idx_user_priority ON app(user_priority);

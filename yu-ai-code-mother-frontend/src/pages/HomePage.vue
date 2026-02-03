@@ -3,7 +3,15 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useLoginUserStore } from '@/stores/loginUser'
-import { addApp, listMyAppVoByPage, listGoodAppVoByPage, updateAppVisualRange, deleteApp } from '@/api/appController'
+import { 
+  addApp, 
+  listMyAppVoByPage, 
+  listGoodAppVoByPage, 
+  updateAppVisualRange, 
+  deleteApp,
+  applyForFeatured,
+  updateMyPriority
+} from '@/api/appController'
 import { getDeployUrl } from '@/config/env'
 import AppCard from '@/components/AppCard.vue'
 
@@ -85,8 +93,6 @@ const loadMyApps = async () => {
     const res = await listMyAppVoByPage({
       pageNum: myAppsPage.current,
       pageSize: myAppsPage.pageSize,
-      sortField: 'createTime',
-      sortOrder: 'desc',
     })
 
     if (res.data.code === 0 && res.data.data) {
@@ -104,8 +110,6 @@ const loadFeaturedApps = async () => {
     const res = await listGoodAppVoByPage({
       pageNum: featuredAppsPage.current,
       pageSize: featuredAppsPage.pageSize,
-      sortField: 'createTime',
-      sortOrder: 'desc',
     })
 
     if (res.data.code === 0 && res.data.data) {
@@ -174,6 +178,41 @@ const handleDeleteApp = async (app: API.AppVO) => {
   } catch (error) {
     console.error('删除失败：', error)
     message.error('删除失败')
+  }
+}
+
+// 申请精选
+const handleApplyFeatured = async (app: API.AppVO) => {
+  if (!app.id) return
+  try {
+    const res = await applyForFeatured({ appId: app.id })
+    if (res.data.code === 0) {
+      message.success('申请提交成功，请等待管理员审核')
+      loadMyApps()
+    } else {
+      message.error('申请失败：' + res.data.message)
+    }
+  } catch (error) {
+    console.error('申请精选失败：', error)
+    message.error('申请失败，请重试')
+  }
+}
+
+// 切换置顶
+const handleTogglePin = async (app: API.AppVO) => {
+  if (!app.id) return
+  const newPriority = app.userPriority && app.userPriority > 0 ? 0 : 999
+  try {
+    const res = await updateMyPriority({ appId: app.id, userPriority: newPriority })
+    if (res.data.code === 0) {
+      message.success(newPriority > 0 ? '已置顶' : '已取消置顶')
+      loadMyApps()
+    } else {
+      message.error('操作失败：' + res.data.message)
+    }
+  } catch (error) {
+    console.error('切换置顶失败：', error)
+    message.error('操作失败，请重试')
   }
 }
 
@@ -299,6 +338,8 @@ onMounted(() => {
             @view-work="viewWork"
             @toggle-visual-range="toggleVisualRange"
             @delete-app="handleDeleteApp"
+            @apply-featured="handleApplyFeatured"
+            @toggle-pin="handleTogglePin"
             class="app-card-item"
           />
         </div>
