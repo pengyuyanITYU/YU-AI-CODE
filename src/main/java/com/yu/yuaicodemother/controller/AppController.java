@@ -412,6 +412,21 @@ public class AppController {
     }
 
     /**
+     * 审核精选状态
+     *
+     * @param appReviewRequest
+     * @return
+     */
+    @PostMapping("/admin/review")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> reviewApp(@RequestBody AppReviewRequest appReviewRequest) {
+        ThrowUtils.throwIf(appReviewRequest == null, ErrorCode.PARAMS_ERROR);
+        boolean result = appService.reviewApp(appReviewRequest);
+        return ResultUtils.success(result);
+    }
+
+
+    /**
      * 管理员分页获取应用列表
      *
      * @param appQueryRequest 查询请求

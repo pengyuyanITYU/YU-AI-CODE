@@ -20,7 +20,9 @@ import com.yu.yuaicodemother.exception.ThrowUtils;
 import com.yu.yuaicodemother.mapper.AppMapper;
 import com.yu.yuaicodemother.model.dto.app.AppAddRequest;
 import com.yu.yuaicodemother.model.dto.app.AppQueryRequest;
+import com.yu.yuaicodemother.model.dto.app.AppReviewRequest;
 import com.yu.yuaicodemother.model.entity.App;
+
 import com.yu.yuaicodemother.model.entity.User;
 import com.yu.yuaicodemother.model.enums.AppDeployStatusEnum;
 import com.yu.yuaicodemother.model.enums.AppFeaturedStatusEnum;
@@ -347,8 +349,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         App updateApp = new App();
         updateApp.setId(appId);
         updateApp.setFeaturedStatus(AppFeaturedStatusEnum.PENDING.getValue());
+        // 重新申请时清空上次审核备注
+        updateApp.setReviewMessage("");
         return this.updateById(updateApp);
     }
+
 
     @Override
     public boolean updateMyPriority(Long appId, Integer userPriority, User loginUser) {
@@ -466,4 +471,36 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             return appVO;
         }).collect(Collectors.toList());
     }
+
+    @Override
+    public boolean reviewApp(AppReviewRequest appReviewRequest) {
+        ThrowUtils.throwIf(appReviewRequest == null, ErrorCode.PARAMS_ERROR);
+        Long id = appReviewRequest.getId();
+        Integer featuredStatus = appReviewRequest.getFeaturedStatus();
+        String reviewMessage = appReviewRequest.getReviewMessage();
+
+        // 校验
+        AppFeaturedStatusEnum enumByValue = AppFeaturedStatusEnum.getEnumByValue(featuredStatus);
+        if (id == null || enumByValue == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 如果是拒绝，必须填写原因
+        if (AppFeaturedStatusEnum.REJECTED.equals(enumByValue) && StrUtil.isBlank(reviewMessage)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "请填写拒绝原因");
+        }
+        // 判断是否存在
+        App oldApp = this.getById(id);
+        ThrowUtils.throwIf(oldApp == null, ErrorCode.NOT_FOUND_ERROR);
+        // 状态检查：只有 PENDING 状态的应用可以被审核（通过或拒绝）
+        if (!Integer.valueOf(AppFeaturedStatusEnum.PENDING.getValue()).equals(oldApp.getFeaturedStatus())){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "该应用当前不在审核队列中");
+        }
+
+        App app = new App();
+        app.setId(id);
+        app.setFeaturedStatus(featuredStatus);
+        app.setReviewMessage(reviewMessage);
+        return this.updateById(app);
+    }
 }
+

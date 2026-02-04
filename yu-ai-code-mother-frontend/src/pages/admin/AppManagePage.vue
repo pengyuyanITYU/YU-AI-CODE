@@ -106,22 +106,23 @@
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" size="small" @click="editApp(record)"> 编辑 </a-button>
-            <a-dropdown>
+            <a-dropdown v-if="record.featuredStatus === AppFeaturedStatusEnum.PENDING">
               <a-button type="link" size="small"> 审核 <DownOutlined /></a-button>
               <template #overlay>
                 <a-menu>
-                  <a-menu-item @click="doReview(record, AppFeaturedStatusEnum.FEATURED)">
+                  <a-menu-item @click="showReviewModal(record, AppFeaturedStatusEnum.FEATURED)">
                     通过精选
                   </a-menu-item>
-                  <a-menu-item @click="doReview(record, AppFeaturedStatusEnum.REJECTED)" danger>
+                  <a-menu-item @click="showReviewModal(record, AppFeaturedStatusEnum.REJECTED)" danger>
                     拒绝申请
-                  </a-menu-item>
-                  <a-menu-item @click="doReview(record, AppFeaturedStatusEnum.NOT_APPLIED)">
-                    重置状态
                   </a-menu-item>
                 </a-menu>
               </template>
             </a-dropdown>
+            <a-button v-else-if="record.featuredStatus === AppFeaturedStatusEnum.FEATURED" 
+                      type="link" size="small" @click="doReview(record, AppFeaturedStatusEnum.NOT_APPLIED)">
+              取消精选
+            </a-button>
             <a-popconfirm title="确定要删除这个应用吗？" @confirm="deleteApp(record.id)">
               <a-button type="link" danger size="small">删除</a-button>
             </a-popconfirm>
@@ -129,6 +130,26 @@
         </template>
       </template>
     </a-table>
+
+    <!-- 审核对话框 -->
+    <a-modal
+      v-model:visible="reviewModalVisible"
+      title="应用精选审核"
+      @ok="handleReviewSubmit"
+      :confirm-loading="reviewLoading"
+      ok-text="确认"
+      cancel-text="取消"
+    >
+      <a-form :model="reviewForm" layout="vertical">
+        <a-form-item label="审核备注" :required="reviewForm.featuredStatus === AppFeaturedStatusEnum.REJECTED">
+          <a-textarea
+            v-model:value="reviewForm.reviewMessage"
+            placeholder="请输入审核意见或拒绝原因"
+            :rows="4"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -137,7 +158,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { DownOutlined } from '@ant-design/icons-vue'
-import { listAppVoByPageByAdmin, deleteAppByAdmin, updateAppByAdmin } from '@/api/appController'
+import { listAppVoByPageByAdmin, deleteAppByAdmin, updateAppByAdmin, reviewApp } from '@/api/appController'
 import { CODE_GEN_TYPE_OPTIONS, formatCodeGenType } from '@/utils/codeGenTypes'
 import { formatTime } from '@/utils/time'
 import { 
@@ -151,6 +172,45 @@ import {
 import UserInfo from '@/components/UserInfo.vue'
 
 const router = useRouter()
+
+// 审核表单状态
+const reviewModalVisible = ref(false)
+const reviewLoading = ref(false)
+const reviewForm = reactive({
+  id: 0,
+  featuredStatus: AppFeaturedStatusEnum.FEATURED,
+  reviewMessage: '',
+})
+
+const showReviewModal = (app: API.AppVO, status: number) => {
+  reviewForm.id = app.id as number
+  reviewForm.featuredStatus = status
+  reviewForm.reviewMessage = ''
+  reviewModalVisible.value = true
+}
+
+const handleReviewSubmit = async () => {
+  if (reviewForm.featuredStatus === AppFeaturedStatusEnum.REJECTED && !reviewForm.reviewMessage) {
+    message.warning('拒绝申请时必须填写原因')
+    return
+  }
+  reviewLoading.value = true
+  try {
+    const res = await reviewApp(reviewForm)
+    if (res.data.code === 0) {
+      message.success('审核处理成功')
+      reviewModalVisible.value = false
+      fetchData()
+    } else {
+      message.error('处理失败：' + res.data.message)
+    }
+  } catch (error) {
+    message.error('系统错误')
+  } finally {
+    reviewLoading.value = false
+  }
+}
+
 
 const columns = [
   {

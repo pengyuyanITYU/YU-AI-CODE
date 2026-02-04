@@ -4,7 +4,9 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
 import com.yu.yuaicodemother.model.dto.app.AppAddRequest;
 import com.yu.yuaicodemother.model.dto.app.AppQueryRequest;
+import com.yu.yuaicodemother.model.dto.app.AppReviewRequest;
 import com.yu.yuaicodemother.model.entity.App;
+
 import com.yu.yuaicodemother.model.entity.User;
 import com.yu.yuaicodemother.model.vo.app.AppVO;
 import reactor.core.publisher.Flux;
@@ -77,4 +79,13 @@ public interface AppService extends IService<App> {
      * @param genStatus 生成状态（0=未开始，1=生成中，2=生成成功，3=生成失败）
      */
     void updateGenStatus(Long appId, Integer genStatus);
+
+    /**
+     * 审核应用精选状态
+     *
+     * @param appReviewRequest
+     * @return
+     */
+    boolean reviewApp(AppReviewRequest appReviewRequest);
 }
+

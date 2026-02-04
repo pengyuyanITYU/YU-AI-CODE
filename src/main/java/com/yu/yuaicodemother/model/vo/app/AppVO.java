@@ -95,6 +95,12 @@ public class AppVO implements Serializable {
      */
     private Integer userPriority;
 
+    /**
+     * 审核信息
+     */
+    private String reviewMessage;
+
     @Serial
+
     private static final long serialVersionUID = 1L;
 }

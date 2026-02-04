@@ -116,16 +116,35 @@ const originItems = [
     title: '用户管理',
   },
   {
-    key: '/admin/appManage',
+    key: '/admin/appManage_parent',
     icon: () => h(AppstoreOutlined),
     label: '应用管理',
     title: '应用管理',
+    children: [
+      {
+        key: '/admin/appManage',
+        label: '应用列表',
+        title: '应用列表',
+      },
+      {
+        key: '/admin/appReview',
+        label: '用户申请',
+        title: '用户申请',
+      },
+    ],
   },
 ]
 
 const filterMenus = (menus = [] as MenuProps['items']) => {
   return menus?.filter((menu) => {
-    const menuKey = menu?.key as string
+    if (!menu) return false
+    const menuKey = menu.key as string
+    // 如果是子菜单
+    if ('children' in menu && menu.children) {
+      menu.children = filterMenus(menu.children as MenuProps['items'])
+      return menu.children && menu.children.length > 0
+    }
+    // 普通菜单权限检查
     if (menuKey?.startsWith('/admin')) {
       const loginUser = loginUserStore.loginUser
       if (!loginUser || loginUser.userRole !== 'admin') {
@@ -136,15 +155,20 @@ const filterMenus = (menus = [] as MenuProps['items']) => {
   })
 }
 
-const menuItems = computed<MenuProps['items']>(() => filterMenus(originItems))
+const menuItems = computed<MenuProps['items']>(() => filterMenus(JSON.parse(JSON.stringify(originItems))))
 
 const handleMenuClick: MenuProps['onClick'] = (e) => {
   const key = e.key as string
+  // 如果是父级菜单（带 _parent 后缀），不跳转
+  if (key.endsWith('_parent')) {
+    return
+  }
   selectedKeys.value = [key]
   if (key.startsWith('/')) {
     router.push(key)
   }
 }
+
 
 const doLogout = async () => {
   const res = await userLogout()

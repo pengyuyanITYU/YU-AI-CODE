@@ -36,7 +36,14 @@ declare namespace API {
     appName?: string
   }
 
+  type AppReviewRequest = {
+    id?: number
+    featuredStatus?: number
+    reviewMessage?: string
+  }
+
   type AppVO = {
+
     id?: number
     appName?: string
     cover?: string
@@ -47,7 +54,9 @@ declare namespace API {
     priority?: number
     featuredStatus?: number
     userPriority?: number
+    reviewMessage?: string
     userId?: number
+
     currentVersion?: number
     deployStatus?: number
     genStatus?: number

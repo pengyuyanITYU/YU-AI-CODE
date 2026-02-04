@@ -136,8 +136,15 @@ public class App implements Serializable {
     private Integer userPriority;
 
     /**
+     * 审核信息
+     */
+    @Column("review_message")
+    private String reviewMessage;
+
+    /**
      * 是否删除
      */
+
     @Column(value = "isDelete", isLogicDelete = true)
     private Integer isDelete;
 

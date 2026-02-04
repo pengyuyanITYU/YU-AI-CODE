@@ -36,12 +36,20 @@
                  style="margin: 0; font-size: 10px; padding: 0 4px; line-height: 1.6;">
             {{ APP_DEPLOY_STATUS_MAP[app.deployStatus as AppDeployStatusEnum]?.text }}
           </a-tag>
-          <a-tag v-if="app.featuredStatus !== undefined && app.featuredStatus !== AppFeaturedStatusEnum.NOT_APPLIED"
+          <a-tooltip v-if="app.featuredStatus === AppFeaturedStatusEnum.REJECTED && app.reviewMessage" 
+                     :title="'拒绝原因：' + app.reviewMessage">
+            <a-tag :color="APP_FEATURED_STATUS_MAP[app.featuredStatus as AppFeaturedStatusEnum]?.color"
+                   style="margin: 0; font-size: 10px; padding: 0 4px; line-height: 1.6; cursor: help;">
+              {{ APP_FEATURED_STATUS_MAP[app.featuredStatus as AppFeaturedStatusEnum]?.text }}
+            </a-tag>
+          </a-tooltip>
+          <a-tag v-else-if="app.featuredStatus !== undefined && app.featuredStatus !== AppFeaturedStatusEnum.NOT_APPLIED"
                  :color="APP_FEATURED_STATUS_MAP[app.featuredStatus as AppFeaturedStatusEnum]?.color"
                  style="margin: 0; font-size: 10px; padding: 0 4px; line-height: 1.6;">
             {{ APP_FEATURED_STATUS_MAP[app.featuredStatus as AppFeaturedStatusEnum]?.text }}
           </a-tag>
         </a-space>
+
       </div>
     </div>
     <div class="app-info">
