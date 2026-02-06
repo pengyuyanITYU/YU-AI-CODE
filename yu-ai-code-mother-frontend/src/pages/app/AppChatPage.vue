@@ -79,7 +79,9 @@
           </div>
           <div v-for="(message, index) in messages" :key="index" class="message-item">
             <div v-if="message.type === 'user'" class="user-message">
-              <div class="message-content">{{ message.content }}</div>
+              <div class="message-content">
+                <MarkdownRenderer :content="formatMessageContent(message.content)" />
+              </div>
               <div class="message-avatar">
                 <a-avatar :src="loginUserStore.loginUser.userAvatar" />
               </div>
@@ -602,7 +604,16 @@ const fetchAppInfo = async () => {
           messages.value.length === 0 &&
           historyLoaded.value
       ) {
-        await sendInitialMessage(appInfo.value.initPrompt)
+        // 从 query 中尝试获取透传的文件列表
+        let initialFiles: UploadedFile[] = []
+        if (route.query.files) {
+          try {
+            initialFiles = JSON.parse(decodeURIComponent(route.query.files as string))
+          } catch (e) {
+            console.error('解析初始文件列表失败', e)
+          }
+        }
+        await sendInitialMessage(appInfo.value.initPrompt, initialFiles)
       }
     } else {
       message.error('获取应用信息失败')
@@ -616,11 +627,21 @@ const fetchAppInfo = async () => {
 }
 
 // 发送初始消息
-const sendInitialMessage = async (prompt: string) => {
+const sendInitialMessage = async (prompt: string, initialFiles: UploadedFile[] = []) => {
+  // 构造展示内容 (多模态 JSON)
+  const mmContent = {
+    text: prompt,
+    attachments: initialFiles.map(f => ({
+      fileName: f.fileName,
+      type: f.fileType, // 直接使用原始类型 (image/document)
+      url: f.url
+    }))
+  }
+
   // 添加用户消息
   messages.value.push({
     type: 'user',
-    content: prompt,
+    content: JSON.stringify(mmContent),
   })
 
   // 添加AI消息占位符
@@ -636,7 +657,7 @@ const sendInitialMessage = async (prompt: string) => {
 
   // 开始生成
   isGenerating.value = true
-  await generateCode(prompt, [], aiMessageIndex)
+  await generateCode(prompt, initialFiles, aiMessageIndex)
 }
 
 // 发送消息
@@ -666,15 +687,19 @@ const sendMessage = async () => {
   fileList.value = [] // 清空文件列表
 
   // 添加用户消息（包含元素信息）
-  // 如果有文件，展示在消息中
-  let displayContent = message
-  if (currentFiles.length > 0) {
-    displayContent += '\n\n**附件:**\n' + currentFiles.map(f => `- [${f.fileName}](${f.url})`).join('\n')
+  // 使用多模态 JSON 格式存入本地列表，以便 formatMessageContent 统一处理
+  const mmContent = {
+    text: message,
+    attachments: currentFiles.map(f => ({
+      fileName: f.fileName,
+      type: f.fileType, // 直接使用原始类型 (image/document)
+      url: f.url
+    }))
   }
 
   messages.value.push({
     type: 'user',
-    content: displayContent,
+    content: JSON.stringify(mmContent),
   })
 
   // 发送消息后，清除选中元素并退出编辑模式
@@ -964,6 +989,45 @@ const getInputPlaceholder = () => {
     return `正在编辑 ${selectedElementInfo.value.tagName.toLowerCase()} 元素，描述您想要的修改...`
   }
   return '请描述你想生成的网站，越详细效果越好哦'
+}
+
+// 格式化消息内容，支持多模态 JSON 解析
+const formatMessageContent = (content: string) => {
+  if (!content) return ''
+  
+  // 1. 尝试解析标准化多模态 JSON
+  if (content.startsWith('{') && content.endsWith('}')) {
+    try {
+      const mmContent = JSON.parse(content)
+      if (mmContent.text || mmContent.attachments) {
+        let result = mmContent.text || ''
+        if (mmContent.attachments && mmContent.attachments.length > 0) {
+          result += '\n\n**附件:**\n'
+          mmContent.attachments.forEach((file: any) => {
+            if (file.type?.toLowerCase() === 'image') {
+              result += `![${file.fileName}](${file.url})\n`
+            } else {
+              result += `- [${file.fileName}](${file.url})\n`
+            }
+          })
+        }
+        return result
+      }
+    } catch (e) {
+      // 解析失败，继续往下走兼容逻辑
+    }
+  }
+
+  // 2. 兼容旧的 UserMessage {...} 格式
+  if (content.startsWith('UserMessage') && content.includes('text = "')) {
+    const match = content.match(/text = "([^"]*)"/)
+    if (match && match[1]) {
+      return match[1]
+    }
+  }
+
+  // 3. 普通文本直接返回
+  return content
 }
 
 // 页面加载时获取应用信息

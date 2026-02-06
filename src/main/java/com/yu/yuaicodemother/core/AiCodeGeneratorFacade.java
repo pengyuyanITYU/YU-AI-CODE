@@ -3,6 +3,7 @@ package com.yu.yuaicodemother.core;
 import cn.hutool.json.JSONUtil;
 import com.yu.yuaicodemother.ai.AiCodeGeneratorService;
 import com.yu.yuaicodemother.ai.AiCodeGeneratorServiceFactory;
+import com.yu.yuaicodemother.ai.MultiModalMessageBuilder;
 import com.yu.yuaicodemother.ai.model.HtmlCodeResult;
 import com.yu.yuaicodemother.ai.model.MultiFileCodeResult;
 import com.yu.yuaicodemother.ai.model.message.AiResponseMessage;
@@ -14,6 +15,8 @@ import com.yu.yuaicodemother.core.saver.CodeFileSaverExecutor;
 import com.yu.yuaicodemother.exception.BusinessException;
 import com.yu.yuaicodemother.exception.ErrorCode;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
+import com.yu.yuaicodemother.model.vo.file.FileProcessResult;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.PartialThinking;
 import dev.langchain4j.service.TokenStream;
@@ -25,6 +28,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * AI 代码生成外观类，组合生成和保存功能
@@ -39,6 +44,9 @@ public class AiCodeGeneratorFacade {
     @Resource
     private VueProjectBuilder vueProjectBuilder;
 
+    @Resource
+    private MultiModalMessageBuilder multiModalMessageBuilder;
+
     /**
      * 统一入口：根据类型生成并保存代码（使用 appId）
      *
@@ -47,27 +55,31 @@ public class AiCodeGeneratorFacade {
      * @return 保存的目录
      */
     public File generateAndSaveCode(String userMessage, CodeGenTypeEnum codeGenTypeEnum, Long appId) {
+        return generateAndSaveCode(userMessage, new ArrayList<>(), codeGenTypeEnum, appId);
+    }
+
+    /**
+     * 统一入口：根据类型生成并保存代码（支持多模态）
+     */
+    public File generateAndSaveCode(String userMessage, List<FileProcessResult> files, CodeGenTypeEnum codeGenTypeEnum, Long appId) {
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成类型为空");
         }
         // 根据appId获取对应的AI服务实例
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId,
                 codeGenTypeEnum);
+
+        UserMessage multimodalMessage = multiModalMessageBuilder.buildMessage(userMessage, files);
+
         return switch (codeGenTypeEnum) {
             case HTML -> {
-                HtmlCodeResult result = aiCodeGeneratorService.generateHTMLCode(userMessage);
+                HtmlCodeResult result = aiCodeGeneratorService.generateHTMLCode(multimodalMessage);
                 yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
-                MultiFileCodeResult result = aiCodeGeneratorService.generateMultiFileCode(userMessage);
+                MultiFileCodeResult result = aiCodeGeneratorService.generateMultiFileCode(multimodalMessage);
                 yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.MULTI_FILE, appId);
             }
-            // case VUE_PROJECT -> {
-            // Flux<String> codeStream =
-            // aiCodeGeneratorService.generateVueProjectCode(appId, userMessage);
-            // yield CodeFileSaverExecutor.executeSaver(codeStream,
-            // CodeGenTypeEnum.VUE_PROJECT, appId);
-            // }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, errorMessage);
@@ -83,23 +95,33 @@ public class AiCodeGeneratorFacade {
      * @param appId           应用 ID
      */
     public Flux<String> generateAndSaveCodeStream(String userMessage, CodeGenTypeEnum codeGenTypeEnum, Long appId) {
+        return generateAndSaveCodeStream(userMessage, new ArrayList<>(), codeGenTypeEnum, appId);
+    }
+
+    /**
+     * 统一入口：根据类型生成并保存代码（流式，支持多模态）
+     */
+    public Flux<String> generateAndSaveCodeStream(String userMessage, List<FileProcessResult> files, CodeGenTypeEnum codeGenTypeEnum, Long appId) {
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "生成类型为空");
         }
         // 根据appId获取对应的AI服务实例
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId,
                 codeGenTypeEnum);
+
+        UserMessage multimodalMessage = multiModalMessageBuilder.buildMessage(userMessage, files);
+
         return switch (codeGenTypeEnum) {
             case HTML -> {
-                Flux<String> codeStream = aiCodeGeneratorService.generateHTMLCodeStream(userMessage);
+                Flux<String> codeStream = aiCodeGeneratorService.generateHTMLCodeStream(multimodalMessage);
                 yield processCodeStream(codeStream, CodeGenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
-                Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
+                Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(multimodalMessage);
                 yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId);
             }
             case VUE_PROJECT -> {
-                TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCode(appId, userMessage);
+                TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCode(appId, multimodalMessage);
                 yield processTokenStream(tokenStream, appId);
             }
             default -> {

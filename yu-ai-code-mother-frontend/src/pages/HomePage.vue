@@ -106,24 +106,36 @@ const createApp = async () => {
 
   creating.value = true
   try {
-    // 构造带文件的初始提示词
-    let finalPrompt = userPrompt.value.trim()
-    if (fileList.value.length > 0) {
-      finalPrompt += '\n\n[附件列表]:\n'
-      fileList.value.forEach(file => {
-        finalPrompt += `- [${file.fileName}](${file.url}) (${file.fileType})\n`
-      })
-    }
-
     const res = await addApp({
-      initPrompt: finalPrompt,
+      initPrompt: userPrompt.value.trim(),
+      fileList: fileList.value.map(f => ({
+        url: f.url,
+        fileName: f.fileName,
+        fileType: f.fileType
+      }))
     })
 
     if (res.data.code === 0 && res.data.data) {
       message.success('AI 正在为您构建应用...')
       // 跳转到对话页面，确保ID是字符串类型
       const appId = String(res.data.data)
-      await router.push(`/app/chat/${appId}`)
+      
+      // 如果有文件，通过 query 参数透传给聊天页
+      let query = {}
+      if (fileList.value.length > 0) {
+        query = {
+          files: encodeURIComponent(JSON.stringify(fileList.value.map(f => ({
+            url: f.url,
+            fileName: f.fileName,
+            fileType: f.fileType
+          }))))
+        }
+      }
+      
+      await router.push({
+        path: `/app/chat/${appId}`,
+        query
+      })
     } else {
       message.error('创建失败：' + res.data.message)
     }

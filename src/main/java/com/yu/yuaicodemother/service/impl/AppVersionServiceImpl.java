@@ -112,7 +112,6 @@ public class AppVersionServiceImpl extends ServiceImpl<AppVersionMapper, AppVers
         if (!app.getUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限操作该应用");
         }
-
         QueryWrapper queryWrapper = QueryWrapper.create()
                 .eq("appId", appId)
                 .eq("version", version);

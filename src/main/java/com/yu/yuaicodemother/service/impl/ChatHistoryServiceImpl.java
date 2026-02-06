@@ -2,6 +2,7 @@ package com.yu.yuaicodemother.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
@@ -9,20 +10,29 @@ import com.yu.yuaicodemother.constant.UserConstant;
 import com.yu.yuaicodemother.exception.ErrorCode;
 import com.yu.yuaicodemother.exception.ThrowUtils;
 import com.yu.yuaicodemother.model.dto.chathistory.ChatHistoryQueryRequest;
+import com.yu.yuaicodemother.model.dto.chathistory.MultiModalContent;
 import com.yu.yuaicodemother.model.entity.App;
 import com.yu.yuaicodemother.model.entity.ChatHistory;
 import com.yu.yuaicodemother.mapper.ChatHistoryMapper;
 import com.yu.yuaicodemother.model.entity.User;
 import com.yu.yuaicodemother.model.enums.ChatHistoryMessageTypeEnum;
+import com.yu.yuaicodemother.model.enums.FileTypeEnum;
+import com.yu.yuaicodemother.model.enums.ProcessStatusEnum;
+import com.yu.yuaicodemother.model.vo.file.FileProcessResult;
 import com.yu.yuaicodemother.service.AppService;
 import com.yu.yuaicodemother.service.ChatHistoryService;
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.Content;
+import dev.langchain4j.data.message.ImageContent;
+import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -40,6 +50,9 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
     @Lazy
     @Resource
     private AppService appService;
+
+    @Resource
+    private com.yu.yuaicodemother.service.FileService fileService;
 
     @Override
     public int loadChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int maxCount) {
@@ -60,19 +73,65 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
             // 先清理历史缓存，防止重复加载
             chatMemory.clear();
             for (ChatHistory history : historyList) {
+                String rawMsg = history.getMessage();
                 if (ChatHistoryMessageTypeEnum.USER.getValue().equals(history.getMessageType())) {
-/*                             UserMessage.from(...)意思： 把一段文本标记为 “用户说的话”。
-                    作用： 大模型需要知道这句话是谁说的。如果是用户说的，模型会把它当作“指令”或“问题”去处理。
-*/
-                    chatMemory.add(UserMessage.from(history.getMessage()));
+                    // 尝试作为多模态 JSON 解析
+                    if (JSONUtil.isTypeJSON(rawMsg)) {
+                        try {
+                            MultiModalContent mmContent = JSONUtil.toBean(rawMsg, MultiModalContent.class);
+                            List<Content> contents = new ArrayList<>();
+                            if (StrUtil.isNotBlank(mmContent.getText())) {
+                                contents.add(TextContent.from(mmContent.getText()));
+                            }
+                            if (CollUtil.isNotEmpty(mmContent.getAttachments())) {
+                                for (MultiModalContent.AttachmentInfo attachment : mmContent.getAttachments()) {
+                                    if (FileTypeEnum.IMAGE.getValue().equalsIgnoreCase(attachment.getType())) {
+                                        contents.add(ImageContent.from(attachment.getUrl()));
+                                    } else {
+                                        // 文档内容按需解析（Lazy Loading）
+                                        String docContent = attachment.getContent();
+                                        if (StrUtil.isBlank(docContent)) {
+                                            FileProcessResult reloadResult = fileService.processFile(attachment.getUrl(), attachment.getFileName());
+                                            if (ProcessStatusEnum.SUCCESS.getValue().equals(reloadResult.getStatus())) {
+                                                docContent = reloadResult.getContent();
+                                            }
+                                        }
+
+                                        if (StrUtil.isNotBlank(docContent)) {
+                                            contents.add(TextContent.from(String.format(
+                                                    "\n\n用户之前上传了文档《%s》，内容如下:\n<file_content>\n%s\n</file_content>\n",
+                                                    attachment.getFileName(),
+                                                    docContent
+                                            )));
+                                        } else {
+                                            // AI 侧隐式告知：文件损坏或不可达 (AI Note)
+                                            contents.add(TextContent.from(String.format(
+                                                    "\n\n[System Note: File \"%s\" was found in history but is currently inaccessible/corrupted. Please proceed without its content.]\n",
+                                                    attachment.getFileName()
+                                            )));
+                                        }
+                                    }
+                                }
+                            }
+                            chatMemory.add(UserMessage.from(contents));
+                            loadedCount++;
+                            continue;
+                        } catch (Exception e) {
+                            log.warn("解析多模态消息 JSON 失败，按普通文本处理: {}", history.getId());
+                        }
+                    }
+
+                    // 兼容旧的 UserMessage {...} 格式或普通文本
+                    String cleanMsg = rawMsg;
+                    if (rawMsg.startsWith("UserMessage") && rawMsg.contains("contents = [")) {
+                        // 简单正则或截取还原
+                        cleanMsg = StrUtil.subBetween(rawMsg, "text = \"", "\"");
+                        if (cleanMsg == null) cleanMsg = rawMsg;
+                    }
+                    chatMemory.add(UserMessage.from(cleanMsg));
                     loadedCount++;
                 } else if (ChatHistoryMessageTypeEnum.AI.getValue().equals(history.getMessageType())) {
-/*
-                  AiMessage.from(...) 把一段文本标记为 “AI 说的话”。
-                 作用： 这是模型自己之前生成的回答。模型看到这个，就知道“哦，这是我之前回答过的内容”，
-                 从而保持对话的连贯性（比如你接着问“它是什么”，AI 知道“它”指代上文它自己提到的东西）。
-*/
-                    chatMemory.add(AiMessage.from(history.getMessage()));
+                    chatMemory.add(AiMessage.from(rawMsg));
                     loadedCount++;
                 }
             }
@@ -111,6 +170,11 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
 
     @Override
     public boolean addChatMessage(Long appId, String message, String messageType, Long userId) {
+        return addChatMessage(appId, message, null, messageType, userId);
+    }
+
+    @Override
+    public boolean addChatMessage(Long appId, String message, List<FileProcessResult> fileList, String messageType, Long userId) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "消息内容不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(messageType), ErrorCode.PARAMS_ERROR, "消息类型不能为空");
@@ -118,9 +182,30 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         // 验证消息类型是否有效
         ChatHistoryMessageTypeEnum messageTypeEnum = ChatHistoryMessageTypeEnum.getEnumByValue(messageType);
         ThrowUtils.throwIf(messageTypeEnum == null, ErrorCode.PARAMS_ERROR, "不支持的消息类型: " + messageType);
+
+        String finalMessage = message;
+        // 如果是用户消息且包含附件，构造 MultiModalContent JSON
+        if (ChatHistoryMessageTypeEnum.USER.getValue().equals(messageType) && CollUtil.isNotEmpty(fileList)) {
+            MultiModalContent mmContent = new MultiModalContent();
+            mmContent.setText(message);
+            List<MultiModalContent.AttachmentInfo> attachments = new ArrayList<>();
+            for (FileProcessResult file : fileList) {
+                // Lean Storage: 持久化时不存储 content，只存元数据
+                attachments.add(new MultiModalContent.AttachmentInfo(
+                        null,
+                        file.getFileName(),
+                        file.getFileType(),
+                        file.getUrl(),
+                        null // 强制置空内容，由 loadChatHistoryToMemory 按需加载
+                ));
+            }
+            mmContent.setAttachments(attachments);
+            finalMessage = JSONUtil.toJsonStr(mmContent);
+        }
+
         ChatHistory chatHistory = ChatHistory.builder()
                 .appId(appId)
-                .message(message)
+                .message(finalMessage)
                 .messageType(messageType)
                 .userId(userId)
                 .build();

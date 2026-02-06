@@ -2,6 +2,8 @@ package com.yu.yuaicodemother.service.impl;
 
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.http.HttpUtil;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yu.yuaicodemother.core.file.processor.FileContentProcessor;
 import com.yu.yuaicodemother.core.file.processor.FileProcessorFactory;
 import com.yu.yuaicodemother.model.enums.ProcessStatusEnum;
@@ -12,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
+import java.util.concurrent.TimeUnit;
 
 
 @Service
@@ -21,8 +24,24 @@ public class FileServiceImpl implements FileService {
     @Resource
     private FileProcessorFactory processorFactory;
 
+    /**
+     * 文件处理结果本地缓存（Key: fileUrl, Value: FileProcessResult）
+     * 有效期 1 小时，防止重复解析
+     */
+    private final Cache<String, FileProcessResult> fileProcessCache = Caffeine.newBuilder()
+            .expireAfterWrite(1, TimeUnit.HOURS)
+            .maximumSize(1000)
+            .build();
+
     @Override
     public FileProcessResult processFile(String fileUrl, String originalFileName) {
+        // 1. 优先从缓存获取
+        FileProcessResult cachedResult = fileProcessCache.getIfPresent(fileUrl);
+        if (cachedResult != null && ProcessStatusEnum.SUCCESS.getValue().equals(cachedResult.getStatus())) {
+            log.info("从缓存获取文件处理结果: {}", originalFileName);
+            return cachedResult;
+        }
+
         File tempFile = null;
         try {
             String extension = FileUtil.extName(originalFileName).toLowerCase();
@@ -36,6 +55,11 @@ public class FileServiceImpl implements FileService {
 
             log.info("文件处理完成: {}, 类型: {}, 状态: {}",
                     originalFileName, result.getFileType(), result.getStatus());
+
+            // 2. 存入缓存
+            if (ProcessStatusEnum.SUCCESS.getValue().equals(result.getStatus())) {
+                fileProcessCache.put(fileUrl, result);
+            }
 
             return result;
 

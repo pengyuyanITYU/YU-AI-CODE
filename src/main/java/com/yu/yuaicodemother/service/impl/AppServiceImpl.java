@@ -9,6 +9,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.yu.yuaicodemother.ai.AiCodeGenTypeRoutingService;
 import com.yu.yuaicodemother.ai.AiCodeGenerateAppNameService;
+import com.yu.yuaicodemother.ai.MultiModalMessageBuilder;
 import com.yu.yuaicodemother.ai.model.CodeGenTypeRoutingResult;
 import com.yu.yuaicodemother.constant.AppConstant;
 import com.yu.yuaicodemother.core.AiCodeGeneratorFacade;
@@ -24,21 +25,19 @@ import com.yu.yuaicodemother.model.dto.app.AppChatRequest;
 import com.yu.yuaicodemother.model.dto.app.AppQueryRequest;
 import com.yu.yuaicodemother.model.dto.app.AppReviewRequest;
 import com.yu.yuaicodemother.model.entity.App;
-
 import com.yu.yuaicodemother.model.entity.User;
-import com.yu.yuaicodemother.model.enums.AppDeployStatusEnum;
-import com.yu.yuaicodemother.model.enums.AppFeaturedStatusEnum;
-import com.yu.yuaicodemother.model.enums.AppGenStatusEnum;
-import com.yu.yuaicodemother.model.enums.ChatHistoryMessageTypeEnum;
-import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
+import com.yu.yuaicodemother.model.enums.*;
 import com.yu.yuaicodemother.model.vo.app.AppVO;
+import com.yu.yuaicodemother.model.vo.file.FileProcessResult;
 import com.yu.yuaicodemother.model.vo.user.UserVO;
 import com.yu.yuaicodemother.monitor.MonitorContext;
 import com.yu.yuaicodemother.monitor.MonitorContextHolder;
 import com.yu.yuaicodemother.service.AppService;
 import com.yu.yuaicodemother.service.ChatHistoryService;
+import com.yu.yuaicodemother.service.FileService;
 import com.yu.yuaicodemother.service.ScreenshotService;
 import com.yu.yuaicodemother.service.UserService;
+import dev.langchain4j.data.message.UserMessage;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -82,6 +81,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private ScreenshotService screenshotService;
 
     @Resource
+    private FileService fileService;
+
+    @Resource
+    private MultiModalMessageBuilder multiModalMessageBuilder;
+
+    @Resource
     private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
 
     @Resource
@@ -91,7 +96,24 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     public Long createApp(AppAddRequest appAddRequest, User loginUser) {
         // 参数校验
         String initPrompt = appAddRequest.getInitPrompt();
+        List<AppChatFile> fileList = appAddRequest.getFileList();
         ThrowUtils.throwIf(StrUtil.isBlank(initPrompt), ErrorCode.PARAMS_ERROR, "初始化 prompt 不能为空");
+
+        // 1. 处理文件列表，收集处理结果
+        List<FileProcessResult> processedFiles = new ArrayList<>();
+        if (CollUtil.isNotEmpty(fileList)) {
+            for (AppChatFile appChatFile : fileList) {
+                try {
+                    FileProcessResult result = fileService.processFile(appChatFile.getUrl(), appChatFile.getFileName());
+                    if (ProcessStatusEnum.SUCCESS.getValue().equals(result.getStatus())) {
+                        processedFiles.add(result);
+                    }
+                } catch (Exception e) {
+                    log.error("文件处理失败: {}", appChatFile.getFileName(), e);
+                }
+            }
+        }
+
         // 构造入库对象
         App app = new App();
         BeanUtil.copyProperties(appAddRequest, app);
@@ -104,17 +126,20 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         try {
             appName = aiCodeGenerateAppNameService.generateAppName(initPrompt);
         } catch (Exception e) {
-            // TODO 生成app名称,失败不给它抛错
             log.error("应用名称生成失败");
         }
         if (appName == null) {
-            // 如果ai生成结果为null,应用名称为initPrompt 前 12 位
-            app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 15)));
+            // 如果ai生成结果为null,应用名称为initPrompt 前 15 位
+            app.setAppName(StrUtil.sub(initPrompt, 0, 15));
         } else {
-            app.setAppName(appName);
+            // 截断 AI 生成的名称，确保不超过 15 位
+            app.setAppName(StrUtil.sub(appName, 0, 15));
         }
+
+        // 构建多模态消息用于路由选择
+        UserMessage multimodalMessage = multiModalMessageBuilder.buildMessage(initPrompt, processedFiles);
         // 使用 AI 智能选择代码生成类型
-        CodeGenTypeRoutingResult result = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt);
+        CodeGenTypeRoutingResult result = aiCodeGenTypeRoutingService.routeCodeGenType(multimodalMessage);
         CodeGenTypeEnum selectedCodeGenType = result.getType();
         app.setCodeGenType(selectedCodeGenType.getValue());
         // 插入数据库
@@ -143,14 +168,19 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
         }
         
-        // 4. 处理文件列表，将其追加到消息上下文中
+        // 4. 处理文件列表，收集处理结果
+        List<FileProcessResult> processedFiles = new ArrayList<>();
         if (CollUtil.isNotEmpty(fileList)) {
-            StringBuilder fileContext = new StringBuilder("\n\n[附件列表]:\n");
-            for (AppChatFile file : fileList) {
-                fileContext.append(String.format("- [%s](%s) (%s)\n", 
-                        file.getFileName(), file.getUrl(), file.getFileType()));
+            for (AppChatFile appChatFile : fileList) {
+                try {
+                    FileProcessResult result = fileService.processFile(appChatFile.getUrl(), appChatFile.getFileName());
+                    if (ProcessStatusEnum.SUCCESS.getValue().equals(result.getStatus())) {
+                        processedFiles.add(result);
+                    }
+                } catch (Exception e) {
+                    log.error("文件处理失败: {}", appChatFile.getFileName(), e);
+                }
             }
-            message += fileContext.toString();
         }
 
         // 5. 获取应用的代码生成类型
@@ -161,7 +191,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         
         // 6. 通过校验后,添加用户消息到对话历史
-        chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(),
+        chatHistoryService.addChatMessage(appId, message, processedFiles, ChatHistoryMessageTypeEnum.USER.getValue(),
                 loginUser.getId());
         MonitorContextHolder.setContext(MonitorContext.builder()
                 .appId(appId.toString())
@@ -172,7 +202,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         updateGenStatus(appId, AppGenStatusEnum.GENERATING.getValue());
         
         // 8. 调用 AI 生成代码（流式）
-        Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
+        Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, processedFiles, codeGenTypeEnum, appId);
         
         // 9. 收集AI响应内容并在完成后记录到对话历史
         Flux<String> result = streamHandlerExecutor
@@ -526,4 +556,3 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         return this.updateById(app);
     }
 }
-

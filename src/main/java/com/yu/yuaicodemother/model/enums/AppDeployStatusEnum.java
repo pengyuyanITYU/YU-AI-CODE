@@ -1,11 +1,8 @@
 package com.yu.yuaicodemother.model.enums;
 
-import lombok.Getter;
-
 /**
  * 应用部署状态枚举
  */
-@Getter
 public enum AppDeployStatusEnum {
 
     NOT_DEPLOYED(0, "未部署"),
@@ -18,6 +15,14 @@ public enum AppDeployStatusEnum {
     AppDeployStatusEnum(int value, String text) {
         this.value = value;
         this.text = text;
+    }
+
+    public int getValue() {
+        return value;
+    }
+
+    public String getText() {
+        return text;
     }
 
     /**

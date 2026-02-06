@@ -6,8 +6,10 @@ import com.mybatisflex.core.service.IService;
 import com.yu.yuaicodemother.model.dto.chathistory.ChatHistoryQueryRequest;
 import com.yu.yuaicodemother.model.entity.ChatHistory;
 import com.yu.yuaicodemother.model.entity.User;
+import com.yu.yuaicodemother.model.vo.file.FileProcessResult;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 
+import java.util.List;
 import java.time.LocalDateTime;
 
 /**
@@ -19,6 +21,9 @@ public interface ChatHistoryService extends IService<ChatHistory> {
 
 
     boolean addChatMessage(Long appId, String message, String messageType, Long userId);
+
+    boolean addChatMessage(Long appId, String message, List<FileProcessResult> fileList, String messageType, Long userId);
+
 
     boolean deleteByAppId(Long appId);
 

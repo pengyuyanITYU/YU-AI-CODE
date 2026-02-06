@@ -1,6 +1,13 @@
 declare namespace API {
+  type AppChatFile = {
+    url?: string
+    fileName?: string
+    fileType?: string
+  }
+
   type AppAddRequest = {
     initPrompt?: string
+    fileList?: AppChatFile[]
   }
 
   type AppAdminUpdateRequest = {
