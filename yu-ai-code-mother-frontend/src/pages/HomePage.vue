@@ -12,8 +12,10 @@ import {
   applyForFeatured,
   updateMyPriority
 } from '@/api/appController'
+import { uploadAndProcessFile, type UploadedFile, getFileIcon } from '@/utils/fileUploadManager'
 import { getDeployUrl } from '@/config/env'
 import AppCard from '@/components/AppCard.vue'
+import { PaperClipOutlined, CloseOutlined } from '@ant-design/icons-vue'
 
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
@@ -21,6 +23,47 @@ const loginUserStore = useLoginUserStore()
 // 用户提示词
 const userPrompt = ref('')
 const creating = ref(false)
+const fileList = ref<UploadedFile[]>([])
+const uploading = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const triggerFileUpload = () => {
+  fileInput.value?.click()
+}
+
+// 处理文件上传
+const handleFileUpload = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (!target.files || target.files.length === 0) return
+
+  const file = target.files[0]
+  // 重置 input，允许重复上传同名文件
+  target.value = ''
+
+  if (!loginUserStore.loginUser.id) {
+    message.warning('请先登录后上传文件')
+    router.push('/user/login')
+    return
+  }
+
+  uploading.value = true
+  try {
+    const uploadedFile = await uploadAndProcessFile(file)
+    if (uploadedFile) {
+      fileList.value.push(uploadedFile)
+      message.success(`文件 ${file.name} 上传成功`)
+    }
+  } catch (error) {
+    console.error('文件上传失败:', error)
+  } finally {
+    uploading.value = false
+  }
+}
+
+// 移除文件
+const removeFile = (index: number) => {
+  fileList.value.splice(index, 1)
+}
 
 // 我的应用数据
 const myApps = ref<API.AppVO[]>([])
@@ -50,8 +93,8 @@ const setPrompt = (prompt: string) => {
 
 // 创建应用
 const createApp = async () => {
-  if (!userPrompt.value.trim()) {
-    message.warning('请输入您的创意想法')
+  if (!userPrompt.value.trim() && fileList.value.length === 0) {
+    message.warning('请输入您的创意想法或上传文件')
     return
   }
 
@@ -63,8 +106,17 @@ const createApp = async () => {
 
   creating.value = true
   try {
+    // 构造带文件的初始提示词
+    let finalPrompt = userPrompt.value.trim()
+    if (fileList.value.length > 0) {
+      finalPrompt += '\n\n[附件列表]:\n'
+      fileList.value.forEach(file => {
+        finalPrompt += `- [${file.fileName}](${file.url}) (${file.fileType})\n`
+      })
+    }
+
     const res = await addApp({
-      initPrompt: userPrompt.value.trim(),
+      initPrompt: finalPrompt,
     })
 
     if (res.data.code === 0 && res.data.data) {
@@ -270,10 +322,41 @@ onMounted(() => {
             class="custom-textarea"
             @keyup.enter="createApp"
           />
+          
+          <!-- 文件列表展示 -->
+          <div v-if="fileList.length > 0" class="file-list">
+            <div v-for="(file, index) in fileList" :key="index" class="file-item">
+              <span class="file-icon">{{ getFileIcon(file.fileType) }}</span>
+              <span class="file-name" :title="file.fileName">{{ file.fileName }}</span>
+              <CloseOutlined class="remove-icon" @click="removeFile(index)" />
+            </div>
+          </div>
+
           <div class="input-footer">
-            <span class="hint-text">
-              <span class="icon">✨</span> 支持 Markdown 格式描述
-            </span>
+            <div class="footer-left">
+              <span class="hint-text">
+                <span class="icon">✨</span> 支持 Markdown 格式描述
+              </span>
+              <div class="upload-wrapper">
+                <input
+                  type="file"
+                  ref="fileInput"
+                  class="hidden-input"
+                  @change="handleFileUpload"
+                  accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.txt,.md,.html,.css,.vue"
+                />
+                <a-tooltip title="上传参考文件 (支持图片/文档/代码)">
+                  <a-button 
+                    type="text" 
+                    class="upload-btn"
+                    :loading="uploading"
+                    @click="triggerFileUpload"
+                  >
+                    <template #icon><PaperClipOutlined /></template>
+                  </a-button>
+                </a-tooltip>
+              </div>
+            </div>
             <a-button
               type="primary"
               class="generate-btn"
@@ -588,6 +671,69 @@ onMounted(() => {
   padding: 8px 16px 12px;
   border-top: 1px solid rgba(148, 163, 184, 0.15);
   margin-top: 4px;
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.upload-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.upload-btn {
+  color: rgba(148, 163, 184, 0.8);
+  transition: all 0.3s;
+  border-radius: 8px;
+}
+
+.upload-btn:hover {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.file-list {
+  padding: 0 16px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+  max-width: 200px;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove-icon {
+  font-size: 10px;
+  color: rgba(148, 163, 184, 0.6);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.remove-icon:hover {
+  color: #ef4444;
 }
 
 .hint-text {

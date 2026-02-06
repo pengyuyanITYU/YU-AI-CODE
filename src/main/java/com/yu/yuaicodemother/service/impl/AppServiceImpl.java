@@ -19,6 +19,8 @@ import com.yu.yuaicodemother.exception.ErrorCode;
 import com.yu.yuaicodemother.exception.ThrowUtils;
 import com.yu.yuaicodemother.mapper.AppMapper;
 import com.yu.yuaicodemother.model.dto.app.AppAddRequest;
+import com.yu.yuaicodemother.model.dto.app.AppChatFile;
+import com.yu.yuaicodemother.model.dto.app.AppChatRequest;
 import com.yu.yuaicodemother.model.dto.app.AppQueryRequest;
 import com.yu.yuaicodemother.model.dto.app.AppReviewRequest;
 import com.yu.yuaicodemother.model.entity.App;
@@ -123,35 +125,56 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     }
 
     @Override
-    public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
+    public Flux<String> chatToGenCode(AppChatRequest appChatRequest, User loginUser) {
+        Long appId = appChatRequest.getAppId();
+        String message = appChatRequest.getMessage();
+        List<AppChatFile> fileList = appChatRequest.getFileList();
+
         // 1. 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+        
         // 2. 查询应用信息
         App app = this.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        
         // 3. 验证用户是否有权限访问该应用，仅本人可以生成代码
         if (!app.getUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
         }
-        // 4. 获取应用的代码生成类型
+        
+        // 4. 处理文件列表，将其追加到消息上下文中
+        if (CollUtil.isNotEmpty(fileList)) {
+            StringBuilder fileContext = new StringBuilder("\n\n[附件列表]:\n");
+            for (AppChatFile file : fileList) {
+                fileContext.append(String.format("- [%s](%s) (%s)\n", 
+                        file.getFileName(), file.getUrl(), file.getFileType()));
+            }
+            message += fileContext.toString();
+        }
+
+        // 5. 获取应用的代码生成类型
         String codeGenTypeStr = app.getCodeGenType();
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenTypeStr);
         if (codeGenTypeEnum == null) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
         }
-        // 5. 通过校验后,添加用户消息到对话历史
+        
+        // 6. 通过校验后,添加用户消息到对话历史
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(),
                 loginUser.getId());
         MonitorContextHolder.setContext(MonitorContext.builder()
                 .appId(appId.toString())
                 .userId(loginUser.getId().toString())
                 .build());
-        // 6. 更新生成状态为"生成中"
+        
+        // 7. 更新生成状态为"生成中"
         updateGenStatus(appId, AppGenStatusEnum.GENERATING.getValue());
-        // 7. 调用 AI 生成代码（流式）
+        
+        // 8. 调用 AI 生成代码（流式）
         Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
-        // 8. 收集AI响应内容并在完成后记录到对话历史
+        
+        // 9. 收集AI响应内容并在完成后记录到对话历史
         Flux<String> result = streamHandlerExecutor
                 .doExecute(contentFlux, chatHistoryService, appId, loginUser, codeGenTypeEnum)
                 .doOnComplete(() -> {

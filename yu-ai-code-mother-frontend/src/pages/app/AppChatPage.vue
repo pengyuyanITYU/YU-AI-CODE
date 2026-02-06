@@ -159,7 +159,37 @@
                 @keydown.enter.prevent="sendMessage"
                 :disabled="isGenerating"
             />
+            <!-- 文件列表展示 -->
+            <div v-if="fileList.length > 0" class="file-list">
+              <div v-for="(file, index) in fileList" :key="index" class="file-item">
+                <span class="file-icon">{{ getFileIcon(file.fileType) }}</span>
+                <span class="file-name" :title="file.fileName">{{ file.fileName }}</span>
+                <CloseOutlined class="remove-icon" @click="removeFile(index)" />
+              </div>
+            </div>
+
             <div class="input-actions">
+              <div class="action-left">
+                <input
+                  type="file"
+                  ref="fileInput"
+                  class="hidden-input"
+                  @change="handleFileUpload"
+                  accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.txt,.md,.html,.css,.vue"
+                />
+                <a-tooltip title="上传参考文件">
+                  <a-button 
+                    type="text" 
+                    class="action-btn"
+                    :loading="uploading"
+                    @click="triggerFileUpload"
+                    :disabled="!isOwner"
+                  >
+                    <template #icon><PaperClipOutlined /></template>
+                  </a-button>
+                </a-tooltip>
+              </div>
+
               <a-button
                   type="primary"
                   @click="sendMessage"
@@ -283,6 +313,7 @@ import { listVersions, rollbackVersion } from '@/api/appVersionController'
 import { listAppChatHistory } from '@/api/chatHistoryController'
 import { CodeGenTypeEnum, formatCodeGenType } from '@/utils/codeGenTypes'
 import { AppDeployStatusEnum } from '@/utils/appStatus'
+import { uploadAndProcessFile, type UploadedFile, getFileIcon } from '@/utils/fileUploadManager'
 import request from '@/request'
 
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
@@ -304,6 +335,8 @@ import {
   HistoryOutlined,
   LeftOutlined,
   RightOutlined,
+  PaperClipOutlined,
+  CloseOutlined
 } from '@ant-design/icons-vue'
 
 const route = useRoute()
@@ -326,6 +359,46 @@ const messages = ref<Message[]>([])
 const userInput = ref('')
 const isGenerating = ref(false)
 const messagesContainer = ref<HTMLElement>()
+const fileList = ref<UploadedFile[]>([])
+const uploading = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+
+const triggerFileUpload = () => {
+  fileInput.value?.click()
+}
+
+// 处理文件上传
+const handleFileUpload = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  if (!target.files || target.files.length === 0) return
+
+  const file = target.files[0]
+  // 重置 input
+  target.value = ''
+
+  if (!loginUserStore.loginUser.id) {
+    message.warning('请先登录后上传文件')
+    return
+  }
+
+  uploading.value = true
+  try {
+    const uploadedFile = await uploadAndProcessFile(file)
+    if (uploadedFile) {
+      fileList.value.push(uploadedFile)
+      message.success(`文件 ${file.name} 上传成功`)
+    }
+  } catch (error) {
+    console.error('文件上传失败:', error)
+  } finally {
+    uploading.value = false
+  }
+}
+
+// 移除文件
+const removeFile = (index: number) => {
+  fileList.value.splice(index, 1)
+}
 
 // 对话历史相关
 const loadingHistory = ref(false)
@@ -563,12 +636,12 @@ const sendInitialMessage = async (prompt: string) => {
 
   // 开始生成
   isGenerating.value = true
-  await generateCode(prompt, aiMessageIndex)
+  await generateCode(prompt, [], aiMessageIndex)
 }
 
 // 发送消息
 const sendMessage = async () => {
-  if (!userInput.value.trim() || isGenerating.value) {
+  if ((!userInput.value.trim() && fileList.value.length === 0) || isGenerating.value) {
     return
   }
 
@@ -585,11 +658,23 @@ const sendMessage = async () => {
     }
     message += elementContext
   }
+  
+  // 保存当前要发送的文件列表副本
+  const currentFiles = [...fileList.value]
+  
   userInput.value = ''
+  fileList.value = [] // 清空文件列表
+
   // 添加用户消息（包含元素信息）
+  // 如果有文件，展示在消息中
+  let displayContent = message
+  if (currentFiles.length > 0) {
+    displayContent += '\n\n**附件:**\n' + currentFiles.map(f => `- [${f.fileName}](${f.url})`).join('\n')
+  }
+
   messages.value.push({
     type: 'user',
-    content: message,
+    content: displayContent,
   })
 
   // 发送消息后，清除选中元素并退出编辑模式
@@ -613,112 +698,93 @@ const sendMessage = async () => {
 
   // 开始生成
   isGenerating.value = true
-  await generateCode(message, aiMessageIndex)
+  await generateCode(message, currentFiles, aiMessageIndex)
 }
 
-// 生成代码 - 使用 EventSource 处理流式响应
-const generateCode = async (userMessage: string, aiMessageIndex: number) => {
-  let eventSource: EventSource | null = null
-  let streamCompleted = false
-
+// 生成代码 - 使用 fetch 处理 POST 流式响应
+const generateCode = async (userMessage: string, files: UploadedFile[], aiMessageIndex: number) => {
   try {
-    // 获取 axios 配置的 baseURL
     const baseURL = request.defaults.baseURL || API_BASE_URL
+    const url = `${baseURL}/app/chat/gen/code`
 
-    // 构建URL参数
-    const params = new URLSearchParams({
-      appId: appId.value || '',
-      message: userMessage,
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        appId: appId.value,
+        message: userMessage,
+        fileList: files.map(f => ({
+          url: f.url,
+          fileName: f.fileName,
+          fileType: f.fileType
+        }))
+      }),
     })
 
-    const url = `${baseURL}/app/chat/gen/code?${params}`
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
 
-    // 创建 EventSource 连接
-    eventSource = new EventSource(url, {
-      withCredentials: true,
-    })
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('Response body is null')
+    }
 
+    const decoder = new TextDecoder()
     let fullContent = ''
 
-    // 处理接收到的消息
-    eventSource.onmessage = function (event) {
-      if (streamCompleted) return
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
 
-      try {
-        // 解析JSON包装的数据
-        const parsed = JSON.parse(event.data)
-        const content = parsed.d
+      const chunk = decoder.decode(value)
+      const lines = chunk.split('\n\n')
 
-        // 拼接内容
-        if (content !== undefined && content !== null) {
-          fullContent += content
-          messages.value[aiMessageIndex].content = fullContent
-          messages.value[aiMessageIndex].loading = false
-          scrollToBottom()
+      for (const line of lines) {
+        if (line.startsWith('data:')) {
+          const data = line.slice(5).trim()
+          if (!data) continue
+          
+          if (data === '[DONE]') {
+            // Stream finished
+            continue
+          }
+
+          try {
+            const parsed = JSON.parse(data)
+            
+            // 处理 done 事件
+            if (parsed.event === 'done') {
+               continue
+            }
+            
+            const content = parsed.d
+            if (content !== undefined && content !== null) {
+              fullContent += content
+              messages.value[aiMessageIndex].content = fullContent
+              messages.value[aiMessageIndex].loading = false
+              scrollToBottom()
+            }
+          } catch (e) {
+            // Ignore parse errors for incomplete chunks
+          }
         }
-      } catch (error) {
-        console.error('解析消息失败:', error)
-        handleError(error, aiMessageIndex)
       }
     }
+    
+    // 完成后处理
+    isGenerating.value = false
+    
+    // 延迟更新预览
+    setTimeout(async () => {
+      await fetchAppInfo()
+      updatePreview()
+    }, 1000)
 
-    // 处理done事件
-    eventSource.addEventListener('done', function () {
-      if (streamCompleted) return
-
-      streamCompleted = true
-      isGenerating.value = false
-      eventSource?.close()
-
-      // 延迟更新预览，确保后端已完成处理
-      setTimeout(async () => {
-        await fetchAppInfo()
-        updatePreview()
-      }, 1000)
-    })
-
-    // 处理business-error事件（后端限流等错误）
-    eventSource.addEventListener('business-error', function (event: MessageEvent) {
-      if (streamCompleted) return
-
-      try {
-        const errorData = JSON.parse(event.data)
-        console.error('SSE业务错误事件:', errorData)
-
-        // 显示具体的错误信息
-        const errorMessage = errorData.message || '生成过程中出现错误'
-        messages.value[aiMessageIndex].content = `❌ ${errorMessage}`
-        messages.value[aiMessageIndex].loading = false
-        message.error(errorMessage)
-
-        streamCompleted = true
-        isGenerating.value = false
-        eventSource?.close()
-      } catch (parseError) {
-        console.error('解析错误事件失败:', parseError, '原始数据:', event.data)
-        handleError(new Error('服务器返回错误'), aiMessageIndex)
-      }
-    })
-
-    // 处理错误
-    eventSource.onerror = function () {
-      if (streamCompleted || !isGenerating.value) return
-      // 检查是否是正常的连接关闭
-      if (eventSource?.readyState === EventSource.CONNECTING) {
-        streamCompleted = true
-        isGenerating.value = false
-        eventSource?.close()
-
-        setTimeout(async () => {
-          await fetchAppInfo()
-          updatePreview()
-        }, 1000)
-      } else {
-        handleError(new Error('SSE连接错误'), aiMessageIndex)
-      }
-    }
   } catch (error) {
-    console.error('创建 EventSource 失败：', error)
+    console.error('生成代码失败：', error)
     handleError(error, aiMessageIndex)
   }
 }
@@ -1124,6 +1190,66 @@ onUnmounted(() => {
   position: absolute;
   bottom: 8px;
   right: 8px;
+  left: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.action-left {
+  display: flex;
+  align-items: center;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.action-btn {
+  color: rgba(148, 163, 184, 0.6);
+  transition: all 0.3s;
+}
+
+.action-btn:hover {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.file-list {
+  padding: 0 16px 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.9);
+  max-width: 150px;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove-icon {
+  font-size: 10px;
+  color: rgba(148, 163, 184, 0.6);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.remove-icon:hover {
+  color: #ef4444;
 }
 
 /* 右侧预览区域 */

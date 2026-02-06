@@ -78,10 +78,7 @@ public class CosManager {
                 PutObjectRequest putObjectRequest = new PutObjectRequest(cosClientConfig.getBucket(), key, uploadStream, metadata);
                 cosClient.putObject(putObjectRequest);
 
-                // 5. 构建并返回访问URL
-                // 注意：这里假设 cosClientConfig.getHost() 已经包含了末尾的斜杠，或者 key 开头有斜杠
-                // 如果没有，建议优化为: cosClientConfig.getHost().replaceAll("/$", "") + "/" + key.replaceAll("^/", "")
-                String resultUrl = String.format("%s%s", cosClientConfig.getHost(), key);
+                String resultUrl = cosClientConfig.getHost().replaceAll("/$", "") + "/" + key.replaceAll("^/", "");
                 log.info("网络文件上传COS成功: Source={} -> Target={}", url, resultUrl);
                 return resultUrl;
             }
@@ -115,7 +112,7 @@ public class CosManager {
         PutObjectResult result = putObject(key, file);
         if (result != null) {
             // 构建访问URL
-            String url = String.format("%s%s", cosClientConfig.getHost(), key);
+            String url = cosClientConfig.getHost().replaceAll("/$", "") + "/" + key.replaceAll("^/", "");
             log.info("文件上传COS成功: {} -> {}", file.getName(), url);
             return url;
         } else {

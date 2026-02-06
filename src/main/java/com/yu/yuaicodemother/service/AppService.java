@@ -3,6 +3,7 @@ package com.yu.yuaicodemother.service;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
 import com.yu.yuaicodemother.model.dto.app.AppAddRequest;
+import com.yu.yuaicodemother.model.dto.app.AppChatRequest;
 import com.yu.yuaicodemother.model.dto.app.AppQueryRequest;
 import com.yu.yuaicodemother.model.dto.app.AppReviewRequest;
 import com.yu.yuaicodemother.model.entity.App;
@@ -47,7 +48,7 @@ public interface AppService extends IService<App> {
 
     List<AppVO> getAppVOList(List<App> appList);
 
-    Flux<String> chatToGenCode(Long appId, String message, User loginUser);
+    Flux<String> chatToGenCode(AppChatRequest appChatRequest, User loginUser);
 
     /**
      * 部署应用（上线）
