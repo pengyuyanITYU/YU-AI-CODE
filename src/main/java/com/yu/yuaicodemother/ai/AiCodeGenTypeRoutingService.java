@@ -15,9 +15,9 @@ public interface AiCodeGenTypeRoutingService {
     /**
      * 根据用户需求智能选择代码生成类型
      *
-     * @param userPrompt 用户输入的需求描述
+     * @param userMessage 用户提示词（多模态）
      * @return 推荐的代码生成类型
      */
     @SystemMessage(fromResource = "prompt/codegen-routing-system-prompt.txt")
-    CodeGenTypeRoutingResult routeCodeGenType(UserMessage userPrompt);
+    CodeGenTypeRoutingResult routeCodeGenType(UserMessage userMessage);
 }

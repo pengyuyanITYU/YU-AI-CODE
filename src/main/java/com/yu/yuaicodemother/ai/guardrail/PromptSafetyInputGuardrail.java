@@ -27,13 +27,17 @@ public class PromptSafetyInputGuardrail implements InputGuardrail {
 
     @Override
     public InputGuardrailResult validate(UserMessage userMessage) {
+        // 1.11.0 提供的 singleText() 只会提取文本内容，自动过滤图片等非文本内容
         String input = userMessage.singleText();
-        // 检查输入长度
-        if (input.length() > 1000) {
-            return fatal("输入内容过长，不要超过 1000 字");
+        
+        // 检查输入长度（仅针对文本内容）
+        if (input != null && input.length() > 2000) {
+            return fatal("输入内容过长，不要超过 2000 字");
         }
         // 检查是否为空
-        if (input.trim().isEmpty()) {
+        if (input == null || input.trim().isEmpty()) {
+            // 如果只有图片没有文字，视情况决定是否放行。
+            // 这里我们要求必须有文字描述。
             return fatal("输入内容不能为空");
         }
         // 检查敏感词
