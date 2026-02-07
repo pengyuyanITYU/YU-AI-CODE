@@ -2,6 +2,7 @@ package com.yu.yuaicodemother.model.dto.app;
 
 import lombok.Data;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 /**
@@ -25,5 +26,6 @@ public class AppChatFile implements Serializable {
      */
     private String fileType;
 
+    @Serial
     private static final long serialVersionUID = 1L;
 }

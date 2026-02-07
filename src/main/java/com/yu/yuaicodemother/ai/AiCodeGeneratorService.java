@@ -17,7 +17,7 @@ public interface AiCodeGeneratorService {
      * */
     @Deprecated
     @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
-    HtmlCodeResult generateHTMLCode(@dev.langchain4j.service.UserMessage dev.langchain4j.data.message.UserMessage userMessage);
+    HtmlCodeResult generateHTMLCode(dev.langchain4j.data.message.UserMessage userMessage);
 
     /**
      * 生成HTML代码   (外部) memorId用法
@@ -27,7 +27,7 @@ public interface AiCodeGeneratorService {
      * */
     @Deprecated
     @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
-    HtmlCodeResult generateHTMLCode(@MemoryId int memoryId, @dev.langchain4j.service.UserMessage dev.langchain4j.data.message.UserMessage userMessage);
+    HtmlCodeResult generateHTMLCode(@MemoryId int memoryId, dev.langchain4j.data.message.UserMessage userMessage);
 
     /**
      *  生成多文件代码
@@ -37,7 +37,7 @@ public interface AiCodeGeneratorService {
      * */
     @Deprecated
     @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
-    MultiFileCodeResult generateMultiFileCode(@dev.langchain4j.service.UserMessage dev.langchain4j.data.message.UserMessage userMessage);
+    MultiFileCodeResult generateMultiFileCode(dev.langchain4j.data.message.UserMessage userMessage);
 
 
     /**
@@ -47,7 +47,7 @@ public interface AiCodeGeneratorService {
      * @return AI输出结果
      * */
     @SystemMessage(fromResource = "prompt/codegen-vue-project-system-prompt.txt")
-    TokenStream generateVueProjectCode(@MemoryId long appId , @dev.langchain4j.service.UserMessage dev.langchain4j.data.message.UserMessage userMessage);
+    TokenStream generateVueProjectCode(@MemoryId long appId , dev.langchain4j.data.message.UserMessage userMessage);
 
 
     /**
@@ -57,7 +57,7 @@ public interface AiCodeGeneratorService {
      * @return AI输出结果
      * */
     @SystemMessage(fromResource = "prompt/codegen-html-system-prompt.txt")
-    Flux<String> generateHTMLCodeStream(@dev.langchain4j.service.UserMessage dev.langchain4j.data.message.UserMessage userMessage);
+    Flux<String> generateHTMLCodeStream(dev.langchain4j.data.message.UserMessage userMessage);
 
     /**
      *  生成多文件代码
@@ -66,6 +66,6 @@ public interface AiCodeGeneratorService {
      * @return AI输出结果
      * */
     @SystemMessage(fromResource = "prompt/codegen-multi-file-system-prompt.txt")
-    Flux<String> generateMultiFileCodeStream(@dev.langchain4j.service.UserMessage dev.langchain4j.data.message.UserMessage userMessage);
+    Flux<String> generateMultiFileCodeStream(dev.langchain4j.data.message.UserMessage userMessage);
 
 }
