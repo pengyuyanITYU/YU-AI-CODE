@@ -80,7 +80,30 @@
           <div v-for="(message, index) in messages" :key="index" class="message-item">
             <div v-if="message.type === 'user'" class="user-message">
               <div class="message-content">
-                <MarkdownRenderer :content="formatMessageContent(message.content)" />
+                <MarkdownRenderer
+                  v-if="getParsedUserMessage(message).text"
+                  :content="sanitizeUserMessageText(getParsedUserMessage(message).text)"
+                />
+                <div
+                  v-if="getParsedUserMessage(message).attachments.length > 0"
+                  class="message-attachments"
+                >
+                  <div
+                    v-for="(attachment, attachmentIndex) in getParsedUserMessage(message).attachments"
+                    :key="`${index}_${attachmentIndex}`"
+                    class="message-attachment-item"
+                  >
+                    <template v-if="isImageAttachment(attachment)">
+                      <a-image
+                        :src="attachment.url"
+                        :alt="attachment.fileName || 'image'"
+                        class="chat-image-attachment"
+                      />
+                      <div class="attachment-name">{{ attachment.fileName || '未命名图片' }}</div>
+                    </template>
+                    <div v-else class="attachment-summary">{{ formatAttachmentSummary(attachment) }}</div>
+                  </div>
+                </div>
               </div>
               <div class="message-avatar">
                 <a-avatar :src="loginUserStore.loginUser.userAvatar" />
@@ -163,8 +186,14 @@
             />
             <!-- 文件列表展示 -->
             <div v-if="fileList.length > 0" class="file-list">
-              <div v-for="(file, index) in fileList" :key="index" class="file-item">
-                <span class="file-icon">{{ getFileIcon(file.fileType) }}</span>
+                  <div v-for="(file, index) in fileList" :key="index" class="file-item">
+                <a-image
+                  v-if="file.fileType === 'image'"
+                  :src="file.url"
+                  :alt="file.fileName"
+                  class="upload-image-thumb"
+                />
+                <span v-else class="file-icon">{{ getFileIcon(file.fileType) }}</span>
                 <span class="file-name" :title="file.fileName">{{ file.fileName }}</span>
                 <CloseOutlined class="remove-icon" @click="removeFile(index)" />
               </div>
@@ -315,7 +344,7 @@ import { listVersions, rollbackVersion } from '@/api/appVersionController'
 import { listAppChatHistory } from '@/api/chatHistoryController'
 import { CodeGenTypeEnum, formatCodeGenType } from '@/utils/codeGenTypes'
 import { AppDeployStatusEnum } from '@/utils/appStatus'
-import { uploadAndProcessFile, type UploadedFile, getFileIcon } from '@/utils/fileUploadManager'
+import { uploadAndProcessFile, type UploadedFile, getFileIcon, consumeInitialFilesFromSession } from '@/utils/fileUploadManager'
 import request from '@/request'
 
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
@@ -357,6 +386,18 @@ interface Message {
   createTime?: string
 }
 
+interface MessageAttachment {
+  fileName?: string
+  type?: string
+  fileType?: string
+  url?: string
+}
+
+interface ParsedUserMessage {
+  text: string
+  attachments: MessageAttachment[]
+}
+
 const messages = ref<Message[]>([])
 const userInput = ref('')
 const isGenerating = ref(false)
@@ -364,6 +405,7 @@ const messagesContainer = ref<HTMLElement>()
 const fileList = ref<UploadedFile[]>([])
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const parsedUserMessageCache = new Map<string, ParsedUserMessage>()
 
 const triggerFileUpload = () => {
   fileInput.value?.click()
@@ -604,15 +646,7 @@ const fetchAppInfo = async () => {
           messages.value.length === 0 &&
           historyLoaded.value
       ) {
-        // 从 query 中尝试获取透传的文件列表
-        let initialFiles: UploadedFile[] = []
-        if (route.query.files) {
-          try {
-            initialFiles = JSON.parse(decodeURIComponent(route.query.files as string))
-          } catch (e) {
-            console.error('解析初始文件列表失败', e)
-          }
-        }
+        const initialFiles = consumeInitialFilesFromSession(id)
         await sendInitialMessage(appInfo.value.initPrompt, initialFiles)
       }
     } else {
@@ -687,7 +721,6 @@ const sendMessage = async () => {
   fileList.value = [] // 清空文件列表
 
   // 添加用户消息（包含元素信息）
-  // 使用多模态 JSON 格式存入本地列表，以便 formatMessageContent 统一处理
   const mmContent = {
     text: message,
     attachments: currentFiles.map(f => ({
@@ -991,43 +1024,89 @@ const getInputPlaceholder = () => {
   return '请描述你想生成的网站，越详细效果越好哦'
 }
 
-// 格式化消息内容，支持多模态 JSON 解析
-const formatMessageContent = (content: string) => {
-  if (!content) return ''
-  
-  // 1. 尝试解析标准化多模态 JSON
+const formatAttachmentSummary = (file: MessageAttachment) => {
+  const type = String(file?.type || file?.fileType || '').toLowerCase()
+  const typeLabel = type === 'image' ? '图片' : type === 'text' ? '文本' : '文档'
+  const icon = type === 'image' ? '🖼️' : type === 'text' ? '📝' : '📄'
+  const fileName = file?.fileName || '未命名附件'
+  return `${icon} ${fileName}（${typeLabel}）`
+}
+
+const sanitizeUserMessageText = (content: string) => {
+  if (!content) {
+    return ''
+  }
+
+  return content.replace(/https?:\/\/[^\s)]+/g, '[附件链接已隐藏]')
+}
+
+const isImageAttachment = (file: MessageAttachment) => {
+  const type = String(file?.type || file?.fileType || '').toLowerCase()
+  return type === 'image' && Boolean(file?.url)
+}
+
+const getParsedUserMessage = (message: Message): ParsedUserMessage => {
+  return parseUserMessageContent(message.content)
+}
+
+const parseUserMessageContent = (content: string): ParsedUserMessage => {
+  const cached = parsedUserMessageCache.get(content)
+  if (cached) {
+    return cached
+  }
+
+  const emptyResult: ParsedUserMessage = {
+    text: '',
+    attachments: [],
+  }
+
+  if (!content) {
+    parsedUserMessageCache.set(content, emptyResult)
+    return emptyResult
+  }
+
   if (content.startsWith('{') && content.endsWith('}')) {
     try {
       const mmContent = JSON.parse(content)
-      if (mmContent.text || mmContent.attachments) {
-        let result = mmContent.text || ''
-        if (mmContent.attachments && mmContent.attachments.length > 0) {
-          result += '\n\n**附件:**\n'
-          mmContent.attachments.forEach((file: any) => {
-            if (file.type?.toLowerCase() === 'image') {
-              result += `![${file.fileName}](${file.url})\n`
-            } else {
-              result += `- [${file.fileName}](${file.url})\n`
-            }
-          })
+      const attachments: MessageAttachment[] = Array.isArray(mmContent?.attachments)
+        ? mmContent.attachments
+            .filter((item: any) => item && (item.url || item.fileName))
+            .map((item: any) => ({
+              fileName: item.fileName,
+              type: item.type,
+              fileType: item.fileType,
+              url: item.url,
+            }))
+        : []
+
+      if (typeof mmContent?.text === 'string' || attachments.length > 0) {
+        const parsed: ParsedUserMessage = {
+          text: typeof mmContent?.text === 'string' ? mmContent.text : '',
+          attachments,
         }
-        return result
+        parsedUserMessageCache.set(content, parsed)
+        return parsed
       }
-    } catch (e) {
-      // 解析失败，继续往下走兼容逻辑
+    } catch {
     }
   }
 
-  // 2. 兼容旧的 UserMessage {...} 格式
   if (content.startsWith('UserMessage') && content.includes('text = "')) {
     const match = content.match(/text = "([^"]*)"/)
-    if (match && match[1]) {
-      return match[1]
+    const parsed: ParsedUserMessage = {
+      text: match && match[1] ? match[1] : content,
+      attachments: [],
     }
+    parsedUserMessageCache.set(content, parsed)
+    return parsed
   }
 
-  // 3. 普通文本直接返回
-  return content
+  const parsed: ParsedUserMessage = {
+    text: content,
+    attachments: [],
+  }
+  parsedUserMessageCache.set(content, parsed)
+  return parsed
 }
 
 // 页面加载时获取应用信息
@@ -1200,6 +1279,44 @@ onUnmounted(() => {
   border: 1px solid rgba(148, 163, 184, 0.2);
   padding: 8px 12px;
 }
+.message-attachments {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-attachment-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-image-attachment {
+  width: 220px;
+  max-width: 100%;
+}
+
+:deep(.chat-image-attachment .ant-image-img) {
+  width: 220px;
+  max-width: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.attachment-name {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.attachment-summary {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
 
 .message-avatar {
   flex-shrink: 0;
@@ -1303,6 +1420,19 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.upload-image-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+:deep(.upload-image-thumb .ant-image-img) {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
 }
 
 .remove-icon {

@@ -1,10 +1,13 @@
 package com.yu.yuaicodemother.ai;
 
 import com.yu.yuaicodemother.ai.model.CodeGenTypeRoutingResult;
+import dev.langchain4j.data.message.TextContent;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.List;
 
 @Slf4j
 @SpringBootTest
@@ -16,22 +19,22 @@ public class AiConcurrentTest {
     @Test
     public void testConcurrentRoutingCalls() throws InterruptedException {
         String[] prompts = {
-                "做一个简单的HTML页面",
-                "做一个多页面网站项目",
-                "做一个Vue管理系统"
+                "Build a simple HTML page",
+                "Build a multi-page website project",
+                "Build a Vue management system"
         };
-        // 使用虚拟线程并发执行
+
         Thread[] threads = new Thread[prompts.length];
         for (int i = 0; i < prompts.length; i++) {
             final String prompt = prompts[i];
             final int index = i + 1;
             threads[i] = Thread.ofVirtual().start(() -> {
                 AiCodeGenTypeRoutingService service = routingServiceFactory.aiCodeGenTypeRoutingService();
-                CodeGenTypeRoutingResult result = service.routeCodeGenType(prompt);
-                log.info("线程 {}: {} -> {}", index, prompt, result.getType().getValue());
+                CodeGenTypeRoutingResult result = service.routeCodeGenType(List.of(TextContent.from(prompt)));
+                log.info("Thread {}: {} -> {}", index, prompt, result.getType().getValue());
             });
         }
-        // 等待所有任务完成
+
         for (Thread thread : threads) {
             thread.join();
         }

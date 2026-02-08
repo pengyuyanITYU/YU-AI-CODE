@@ -86,7 +86,20 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
                             if (CollUtil.isNotEmpty(mmContent.getAttachments())) {
                                 for (MultiModalContent.AttachmentInfo attachment : mmContent.getAttachments()) {
                                     if (FileTypeEnum.IMAGE.getValue().equalsIgnoreCase(attachment.getType())) {
-                                        contents.add(ImageContent.from(attachment.getUrl()));
+                                        String imageContent = attachment.getContent();
+                                        if (StrUtil.isBlank(imageContent) && StrUtil.isNotBlank(attachment.getUrl())) {
+                                            FileProcessResult reloadResult = fileService.processFile(attachment.getUrl(), attachment.getFileName());
+                                            if (ProcessStatusEnum.SUCCESS.getValue().equals(reloadResult.getStatus())
+                                                    && StrUtil.isNotBlank(reloadResult.getContent())) {
+                                                imageContent = reloadResult.getContent();
+                                            }
+                                        }
+                                        if (StrUtil.isBlank(imageContent)) {
+                                            imageContent = attachment.getUrl();
+                                        }
+                                        if (StrUtil.isNotBlank(imageContent)) {
+                                            contents.add(ImageContent.from(imageContent));
+                                        }
                                     } else {
                                         // 文档内容按需解析（Lazy Loading）
                                         String docContent = attachment.getContent();
@@ -99,7 +112,7 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
 
                                         if (StrUtil.isNotBlank(docContent)) {
                                             contents.add(TextContent.from(String.format(
-                                                    "\n\n用户之前上传了文档《%s》，内容如下:\n<file_content>\n%s\n</file_content>\n",
+                                                    "\n\nUser previously uploaded file \"%s\". Content:\n<file_content>\n%s\n</file_content>\n",
                                                     attachment.getFileName(),
                                                     docContent
                                             )));

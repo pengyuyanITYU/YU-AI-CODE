@@ -2,44 +2,50 @@ package com.yu.yuaicodemother.ai;
 
 import com.yu.yuaicodemother.ai.model.HtmlCodeResult;
 import com.yu.yuaicodemother.ai.model.MultiFileCodeResult;
-import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
+import dev.langchain4j.data.message.TextContent;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import reactor.core.publisher.Flux;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.List;
 
 @SpringBootTest
 class AiCodeGeneratorServiceTest {
 
     @Resource
     private AiCodeGeneratorService aiCodeGeneratorService;
+
     @Test
     void generateHTMLCode() {
-        HtmlCodeResult result = aiCodeGeneratorService.generateHTMLCode("做个程序员鱼皮的博客,不超过20行");
-        Assertions.assertNotNull( result);
+        HtmlCodeResult result = aiCodeGeneratorService.generateHTMLCode(
+                List.of(TextContent.from("Build a simple personal blog page in less than 20 lines")));
+        Assertions.assertNotNull(result);
     }
 
     @Test
     void generateMultiFileCode() {
-        MultiFileCodeResult result = aiCodeGeneratorService.generateMultiFileCode("做个程序员鱼皮的留言板,不超过50行");
-        Assertions.assertNotNull( result);
+        MultiFileCodeResult result = aiCodeGeneratorService.generateMultiFileCode(
+                List.of(TextContent.from("Build a lightweight message board app in less than 50 lines")));
+        Assertions.assertNotNull(result);
     }
+
     @Test
     void testChatMemory() {
-        HtmlCodeResult result = aiCodeGeneratorService.generateHTMLCode(1, "做个程序员鱼皮的工具网站，总代码量不超过 20 行");
+        HtmlCodeResult result = aiCodeGeneratorService.generateHTMLCode(1,
+                List.of(TextContent.from("Build a tiny tools site in less than 20 lines")));
         Assertions.assertNotNull(result);
-        result = aiCodeGeneratorService.generateHTMLCode(1, "不要生成网站，告诉我你刚刚做了什么？");
+
+        result = aiCodeGeneratorService.generateHTMLCode(1,
+                List.of(TextContent.from("Do not generate code, tell me what you just did")));
         Assertions.assertNotNull(result);
-        result = aiCodeGeneratorService.generateHTMLCode(2, "做个程序员鱼皮的工具网站，总代码量不超过 20 行");
+
+        result = aiCodeGeneratorService.generateHTMLCode(2,
+                List.of(TextContent.from("Build a tiny tools site in less than 20 lines")));
         Assertions.assertNotNull(result);
-        result = aiCodeGeneratorService.generateHTMLCode(2, "不要生成网站，告诉我你刚刚做了什么？");
+
+        result = aiCodeGeneratorService.generateHTMLCode(2,
+                List.of(TextContent.from("Do not generate code, tell me what you just did")));
         Assertions.assertNotNull(result);
     }
-
-
-
-
 }

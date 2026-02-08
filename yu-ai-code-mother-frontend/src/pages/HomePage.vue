@@ -12,7 +12,7 @@ import {
   applyForFeatured,
   updateMyPriority
 } from '@/api/appController'
-import { uploadAndProcessFile, type UploadedFile, getFileIcon } from '@/utils/fileUploadManager'
+import { uploadAndProcessFile, type UploadedFile, getFileIcon, saveInitialFilesToSession } from '@/utils/fileUploadManager'
 import { getDeployUrl } from '@/config/env'
 import AppCard from '@/components/AppCard.vue'
 import { PaperClipOutlined, CloseOutlined } from '@ant-design/icons-vue'
@@ -120,22 +120,11 @@ const createApp = async () => {
       // 跳转到对话页面，确保ID是字符串类型
       const appId = String(res.data.data)
       
-      // 如果有文件，通过 query 参数透传给聊天页
-      let query = {}
       if (fileList.value.length > 0) {
-        query = {
-          files: encodeURIComponent(JSON.stringify(fileList.value.map(f => ({
-            url: f.url,
-            fileName: f.fileName,
-            fileType: f.fileType
-          }))))
-        }
+        saveInitialFilesToSession(appId, fileList.value)
       }
-      
-      await router.push({
-        path: `/app/chat/${appId}`,
-        query
-      })
+
+      await router.push(`/app/chat/${appId}`)
     } else {
       message.error('创建失败：' + res.data.message)
     }
@@ -337,8 +326,14 @@ onMounted(() => {
           
           <!-- 文件列表展示 -->
           <div v-if="fileList.length > 0" class="file-list">
-            <div v-for="(file, index) in fileList" :key="index" class="file-item">
-              <span class="file-icon">{{ getFileIcon(file.fileType) }}</span>
+              <div v-for="(file, index) in fileList" :key="index" class="file-item">
+              <a-image
+                v-if="file.fileType === 'image'"
+                :src="file.url"
+                :alt="file.fileName"
+                class="upload-image-thumb"
+              />
+              <span v-else class="file-icon">{{ getFileIcon(file.fileType) }}</span>
               <span class="file-name" :title="file.fileName">{{ file.fileName }}</span>
               <CloseOutlined class="remove-icon" @click="removeFile(index)" />
             </div>
@@ -735,6 +730,19 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.upload-image-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+:deep(.upload-image-thumb .ant-image-img) {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
 }
 
 .remove-icon {
