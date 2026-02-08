@@ -1,6 +1,6 @@
-package com.yu.yuaicodemother.langgraph4j;
+package langgraph4j.test.langgraph4j;
 
-import com.yu.yuaicodemother.langgraph4j.state.WorkflowContext;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

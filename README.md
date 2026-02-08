@@ -1,8 +1,8 @@
-# YU-AI-CODE
+# 鱼跃 AI 代码生成平台
 
 ## 鱼跃
 
-<img width="2560" height="1389" alt="image" src="https://github.com/user-attachments/assets/15551c11-db2c-499b-a01f-d403e45c1f6b" />
+<img width="2560" height="1389" alt="项目预览图" src="https://github.com/user-attachments/assets/15551c11-db2c-499b-a01f-d403e45c1f6b" />
 
 ## 主要技术
 
@@ -44,3 +44,4 @@
 ### 2. 谷歌 AI Studio 进不去?
 1. 推荐使用 GitHub 上比较火的工具（如 Clash Verge），价格相对实惠。
    > [Clash Verge Rev GitHub 仓库](https://github.com/clash-verge-rev/clash-verge-rev.git)
+

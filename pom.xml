@@ -35,9 +35,9 @@
         <lombok.version>1.18.36</lombok.version>
 
         <!-- LangChain4j 核心模块版本 (已发布正式版) -->
-        <langchain4j.version>1.7.1</langchain4j.version>
+        <langchain4j.version>1.11.0</langchain4j.version>
         <!-- LangChain4j Starters 和社区模块版本 (目前仍处于 beta 阶段) -->
-        <langchain4j-beta.version>1.7.1-beta14</langchain4j-beta.version>
+        <langchain4j-beta.version>1.11.0-beta19</langchain4j-beta.version>
     </properties>
     <dependencies>
         <dependency>
@@ -49,11 +49,18 @@
             <artifactId>micrometer-registry-prometheus</artifactId>
         </dependency>
 
+
         <!-- 社区模块：Redis Starter (使用 beta 版本) -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-community-redis-spring-boot-starter</artifactId>
             <version>${langchain4j-beta.version}</version>
+        </dependency>
+        <!-- 强制指定 Jedis 版本为 7.2.1，以兼容 LangChain4j 社区模块 (Spring Boot 3.5.9 默认 6.0.0) -->
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>7.2.1</version>
         </dependency>
         <dependency>
             <groupId>com.qcloud</groupId>
@@ -165,14 +172,14 @@
             <artifactId>HikariCP</artifactId>
         </dependency>
 
-        <!-- Langchain4j 核心 (使用正式版 1.2.0) -->
+        <!-- Langchain4j 核心 -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j</artifactId>
             <version>${langchain4j.version}</version>
         </dependency>
 
-        <!-- OpenAI Spring Boot Starter (必须使用 beta 版本，因为它还没有 1.2.0 正式版) -->
+        <!-- OpenAI Spring Boot Starter  -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-open-ai-spring-boot-starter</artifactId>
@@ -235,6 +242,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.13.0</version>
                 <configuration>
+                    <release>21</release>
                     <parameters>true</parameters>
                     <annotationProcessorPaths>
                         <path>

@@ -16,7 +16,7 @@ import com.yu.yuaicodemother.exception.BusinessException;
 import com.yu.yuaicodemother.exception.ErrorCode;
 import com.yu.yuaicodemother.model.enums.CodeGenTypeEnum;
 import com.yu.yuaicodemother.model.vo.file.FileProcessResult;
-import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.message.Content;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.model.chat.response.PartialThinking;
 import dev.langchain4j.service.TokenStream;
@@ -69,15 +69,15 @@ public class AiCodeGeneratorFacade {
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId,
                 codeGenTypeEnum);
 
-        UserMessage multimodalMessage = multiModalMessageBuilder.buildMessage(userMessage, files);
+        List<Content> multimodalContents = multiModalMessageBuilder.buildMessage(userMessage, files);
 
         return switch (codeGenTypeEnum) {
             case HTML -> {
-                HtmlCodeResult result = aiCodeGeneratorService.generateHTMLCode(multimodalMessage);
+                HtmlCodeResult result = aiCodeGeneratorService.generateHTMLCode(multimodalContents);
                 yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
-                MultiFileCodeResult result = aiCodeGeneratorService.generateMultiFileCode(multimodalMessage);
+                MultiFileCodeResult result = aiCodeGeneratorService.generateMultiFileCode(multimodalContents);
                 yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.MULTI_FILE, appId);
             }
             default -> {
@@ -109,19 +109,19 @@ public class AiCodeGeneratorFacade {
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId,
                 codeGenTypeEnum);
 
-        UserMessage multimodalMessage = multiModalMessageBuilder.buildMessage(userMessage, files);
+        List<Content> multimodalContents = multiModalMessageBuilder.buildMessage(userMessage, files);
 
         return switch (codeGenTypeEnum) {
             case HTML -> {
-                Flux<String> codeStream = aiCodeGeneratorService.generateHTMLCodeStream(multimodalMessage);
+                Flux<String> codeStream = aiCodeGeneratorService.generateHTMLCodeStream(multimodalContents);
                 yield processCodeStream(codeStream, CodeGenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
-                Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(multimodalMessage);
+                Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(multimodalContents);
                 yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId);
             }
             case VUE_PROJECT -> {
-                TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCode(appId, multimodalMessage);
+                TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCode(appId, multimodalContents);
                 yield processTokenStream(tokenStream, appId);
             }
             default -> {

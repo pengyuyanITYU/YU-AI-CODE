@@ -1,4 +1,4 @@
-package com.yu.yuaicodemother.langgraph4j.ai;
+package langgraph4j.test.langgraph4j.ai;
 
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;

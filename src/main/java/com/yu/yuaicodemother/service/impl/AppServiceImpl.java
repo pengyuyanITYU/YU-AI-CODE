@@ -29,7 +29,7 @@ import com.yu.yuaicodemother.model.vo.user.UserVO;
 import com.yu.yuaicodemother.monitor.MonitorContext;
 import com.yu.yuaicodemother.monitor.MonitorContextHolder;
 import com.yu.yuaicodemother.service.*;
-import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.data.message.Content;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -129,9 +129,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
 
         // 构建多模态消息用于路由选择
-        UserMessage multimodalMessage = multiModalMessageBuilder.buildMessage(initPrompt, processedFiles);
+        List<Content> multimodalContents = multiModalMessageBuilder.buildMessage(initPrompt, processedFiles);
         // 使用 AI 智能选择代码生成类型
-        CodeGenTypeRoutingResult result = aiCodeGenTypeRoutingService.routeCodeGenType(multimodalMessage);
+        CodeGenTypeRoutingResult result = aiCodeGenTypeRoutingService.routeCodeGenType(multimodalContents);
         CodeGenTypeEnum selectedCodeGenType = result.getType();
         app.setCodeGenType(selectedCodeGenType.getValue());
         // 插入数据库

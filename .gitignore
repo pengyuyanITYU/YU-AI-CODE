@@ -21,6 +21,7 @@ skills
 yu-ai-code-microservice
 *.txt
 summary
+my-skill
 ### STS ###
 .apt_generated
 .classpath

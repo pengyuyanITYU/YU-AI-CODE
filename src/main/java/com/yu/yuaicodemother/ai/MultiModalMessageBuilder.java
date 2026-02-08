@@ -5,7 +5,6 @@ import com.yu.yuaicodemother.model.vo.file.FileProcessResult;
 import dev.langchain4j.data.message.Content;
 import dev.langchain4j.data.message.ImageContent;
 import dev.langchain4j.data.message.TextContent;
-import dev.langchain4j.data.message.UserMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -16,14 +15,13 @@ import java.util.List;
 @Slf4j
 public class MultiModalMessageBuilder {
 
-    public UserMessage buildMessage(String userPrompt, List<FileProcessResult> files) {
-        if (files == null || files.isEmpty()) {
-            return UserMessage.from(userPrompt);
-        }
-
+    public List<Content> buildMessage(String userPrompt, List<FileProcessResult> files) {
         List<Content> contents = new ArrayList<>();
-
         contents.add(TextContent.from(userPrompt));
+
+        if (files == null || files.isEmpty()) {
+            return contents;
+        }
 
         for (FileProcessResult file : files) {
             if (FileTypeEnum.IMAGE.getValue().equals(file.getFileType())) {
@@ -38,7 +36,7 @@ public class MultiModalMessageBuilder {
             }
         }
 
-        return UserMessage.from(contents);
+        return contents;
     }
 
     private String buildDocumentContext(FileProcessResult file) {

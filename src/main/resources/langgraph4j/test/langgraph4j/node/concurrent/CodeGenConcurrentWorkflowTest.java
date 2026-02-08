@@ -1,4 +1,4 @@
-package com.yu.yuaicodemother.langgraph4j.node.concurrent;
+package langgraph4j.test.langgraph4j.node.concurrent;
 
 import com.yu.yuaicodemother.langgraph4j.state.WorkflowContext;
 import org.junit.jupiter.api.Assertions;

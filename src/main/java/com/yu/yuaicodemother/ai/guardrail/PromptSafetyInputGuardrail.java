@@ -1,5 +1,6 @@
 package com.yu.yuaicodemother.ai.guardrail;
 
+import dev.langchain4j.data.message.TextContent;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.guardrail.InputGuardrail;
 import dev.langchain4j.guardrail.InputGuardrailResult;
@@ -7,6 +8,7 @@ import dev.langchain4j.guardrail.InputGuardrailResult;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class PromptSafetyInputGuardrail implements InputGuardrail {
 
@@ -27,9 +29,9 @@ public class PromptSafetyInputGuardrail implements InputGuardrail {
 
     @Override
     public InputGuardrailResult validate(UserMessage userMessage) {
-        // 1.11.0 提供的 singleText() 只会提取文本内容，自动过滤图片等非文本内容
-        String input = userMessage.singleText();
-        
+        // 兼容多模态：仅提取 text 内容做安全校验，忽略 image 等非文本内容
+        String input = extractTextContent(userMessage);
+
         // 检查输入长度（仅针对文本内容）
         if (input != null && input.length() > 2000) {
             return fatal("输入内容过长，不要超过 2000 字");
@@ -54,5 +56,19 @@ public class PromptSafetyInputGuardrail implements InputGuardrail {
             }
         }
         return success();
+    }
+
+    private String extractTextContent(UserMessage userMessage) {
+        if (userMessage == null || userMessage.contents() == null || userMessage.contents().isEmpty()) {
+            return null;
+        }
+
+        String text = userMessage.contents().stream()
+                .filter(content -> content instanceof TextContent)
+                .map(content -> ((TextContent) content).text())
+                .filter(item -> item != null && !item.trim().isEmpty())
+                .collect(Collectors.joining("\n"));
+
+        return text.isEmpty() ? null : text;
     }
 }

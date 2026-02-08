@@ -1,4 +1,4 @@
-package com.yu.yuaicodemother.langgraph4j.tools;
+package langgraph4j.test.langgraph4j.tools;
 
 import com.yu.yuaicodemother.langgraph4j.model.ImageResource;
 import com.yu.yuaicodemother.langgraph4j.model.enums.ImageCategoryEnum;
