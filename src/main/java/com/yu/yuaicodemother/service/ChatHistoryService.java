@@ -33,4 +33,13 @@ public interface ChatHistoryService extends IService<ChatHistory> {
                                                LocalDateTime lastCreateTime,
                                                User loginUser);
     int loadChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int maxCount);
+
+    /**
+     * 导出对话历史为 Markdown 格式
+     *
+     * @param appId    应用ID
+     * @param loginUser 当前登录用户
+     * @return Markdown 格式的对话内容
+     */
+    String exportChatHistoryToMarkdown(Long appId, User loginUser);
 }

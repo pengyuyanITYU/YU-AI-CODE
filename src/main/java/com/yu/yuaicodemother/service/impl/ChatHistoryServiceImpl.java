@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * 对话历史 服务层实现。
@@ -274,6 +275,110 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
             queryWrapper.orderBy("createTime", false);
         }
         return queryWrapper;
+    }
+
+    @Override
+    public String exportChatHistoryToMarkdown(Long appId, User loginUser) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+
+        // 验证权限：只有应用创建者和管理员可以导出
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        boolean isAdmin = UserConstant.ADMIN_ROLE.equals(loginUser.getUserRole());
+        boolean isCreator = app.getUserId().equals(loginUser.getId());
+        ThrowUtils.throwIf(!isAdmin && !isCreator, ErrorCode.NO_AUTH_ERROR, "无权导出该应用的对话历史");
+
+        // 查询所有对话历史（按时间正序排列）
+        QueryWrapper queryWrapper = QueryWrapper.create()
+                .eq("appId", appId)
+                .orderBy("createTime", true);
+        List<ChatHistory> historyList = this.list(queryWrapper);
+
+        if (CollUtil.isEmpty(historyList)) {
+            return "# 对话记录\n\n暂无对话记录。\n";
+        }
+
+        // 构建 Markdown 内容
+        StringBuilder markdown = new StringBuilder();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+        // 标题和元信息
+        markdown.append("# 对话记录 - ").append(app.getAppName()).append("\n\n");
+        markdown.append("**应用ID:** ").append(appId).append("\n");
+        markdown.append("**导出时间:** ").append(LocalDateTime.now().format(formatter)).append("\n");
+        markdown.append("**总消息数:** ").append(historyList.size()).append("\n");
+        markdown.append("\n---\n\n");
+
+        // 遍历所有消息
+        int messageIndex = 1;
+        for (ChatHistory history : historyList) {
+            String messageType = history.getMessageType();
+            String rawMessage = history.getMessage();
+            LocalDateTime createTime = history.getCreateTime();
+
+            markdown.append("## 消息 ").append(messageIndex).append(" | ");
+            if (createTime != null) {
+                markdown.append(createTime.format(formatter));
+            }
+            markdown.append("\n\n");
+
+            if (ChatHistoryMessageTypeEnum.USER.getValue().equals(messageType)) {
+                // 用户消息
+                markdown.append("### 👤 用户\n\n");
+
+                // 尝试解析多模态消息
+                if (JSONUtil.isTypeJSON(rawMessage)) {
+                    try {
+                        MultiModalContent mmContent = JSONUtil.toBean(rawMessage, MultiModalContent.class);
+                        String text = mmContent.getText();
+                        List<MultiModalContent.AttachmentInfo> attachments = mmContent.getAttachments();
+
+                        // 添加文本内容
+                        if (StrUtil.isNotBlank(text)) {
+                            markdown.append(text).append("\n");
+                        }
+
+                        // 添加附件信息
+                        if (CollUtil.isNotEmpty(attachments)) {
+                            markdown.append("\n**附件:**\n");
+                            for (MultiModalContent.AttachmentInfo attachment : attachments) {
+                                String fileName = attachment.getFileName();
+                                String fileType = attachment.getType();
+                                String fileUrl = attachment.getUrl();
+
+                                if ("IMAGE".equalsIgnoreCase(fileType)) {
+                                    markdown.append("- 🖼️ ").append(fileName).append("\n");
+                                    if (StrUtil.isNotBlank(fileUrl)) {
+                                        markdown.append("  - 链接: ").append(fileUrl).append("\n");
+                                    }
+                                } else {
+                                    markdown.append("- 📄 ").append(fileName).append("\n");
+                                    if (StrUtil.isNotBlank(fileUrl)) {
+                                        markdown.append("  - 链接: ").append(fileUrl).append("\n");
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        // 解析失败，按普通文本处理
+                        markdown.append(rawMessage).append("\n");
+                    }
+                } else {
+                    // 普通文本消息
+                    markdown.append(rawMessage).append("\n");
+                }
+            } else if (ChatHistoryMessageTypeEnum.AI.getValue().equals(messageType)) {
+                // AI 消息
+                markdown.append("### 🤖 AI\n\n");
+                markdown.append(rawMessage).append("\n");
+            }
+
+            markdown.append("\n---\n\n");
+            messageIndex++;
+        }
+
+        return markdown.toString();
     }
 
 }

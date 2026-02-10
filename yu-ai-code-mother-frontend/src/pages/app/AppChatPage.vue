@@ -23,6 +23,13 @@
             </template>
           </a-button>
         </a-tooltip>
+        <a-tooltip title="导出对话记录">
+          <a-button type="text" class="header-icon-btn" @click="exportChatHistory" :loading="exporting">
+            <template #icon>
+              <FileMarkdownOutlined />
+            </template>
+          </a-button>
+        </a-tooltip>
         <a-button
             type="primary"
             ghost
@@ -378,7 +385,8 @@ import {
   RightOutlined,
   PaperClipOutlined,
   CloseOutlined,
-  StopOutlined
+  StopOutlined,
+  FileMarkdownOutlined
 } from '@ant-design/icons-vue'
 
 const route = useRoute()
@@ -473,6 +481,9 @@ const deployUrl = ref('')
 
 // 下载相关
 const downloading = ref(false)
+
+// 导出相关
+const exporting = ref(false)
 
 // 可视化编辑相关
 const isEditMode = ref(false)
@@ -942,6 +953,44 @@ const downloadCode = async () => {
     message.error('下载失败，请重试')
   } finally {
     downloading.value = false
+  }
+}
+
+// 导出对话历史
+const exportChatHistory = async () => {
+  if (!appId.value) {
+    message.error('应用ID不存在')
+    return
+  }
+  exporting.value = true
+  try {
+    const API_BASE_URL = request.defaults.baseURL || ''
+    const url = `${API_BASE_URL}/chatHistory/export/${appId.value}`
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      throw new Error(`导出失败: ${response.status}`)
+    }
+    // 获取文件名
+    const contentDisposition = response.headers.get('Content-Disposition')
+    const fileName = contentDisposition?.match(/filename="(.+)"/)?.[1] || `chat-history-${appId.value}.md`
+    // 下载文件
+    const blob = await response.blob()
+    const downloadUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = fileName
+    link.click()
+    // 清理
+    URL.revokeObjectURL(downloadUrl)
+    message.success('对话记录导出成功')
+  } catch (error) {
+    console.error('导出失败：', error)
+    message.error('导出失败，请重试')
+  } finally {
+    exporting.value = false
   }
 }
 

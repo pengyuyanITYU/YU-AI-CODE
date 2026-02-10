@@ -9,17 +9,20 @@ import com.yu.yuaicodemother.constant.UserConstant;
 import com.yu.yuaicodemother.exception.ErrorCode;
 import com.yu.yuaicodemother.exception.ThrowUtils;
 import com.yu.yuaicodemother.model.dto.chathistory.ChatHistoryQueryRequest;
+import com.yu.yuaicodemother.model.entity.ChatHistory;
 import com.yu.yuaicodemother.model.entity.User;
+import com.yu.yuaicodemother.service.ChatHistoryService;
 import com.yu.yuaicodemother.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import com.yu.yuaicodemother.model.entity.ChatHistory;
-import com.yu.yuaicodemother.service.ChatHistoryService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
  * 对话历史 控制层。
@@ -73,5 +76,37 @@ public class ChatHistoryController {
         return ResultUtils.success(result);
     }
 
+    /**
+     * 导出对话历史为 Markdown 文件
+     *
+     * @param appId   应用ID
+     * @param request 请求
+     * @return Markdown 文件
+     */
+    @GetMapping("/export/{appId}")
+    public ResponseEntity<byte[]> exportChatHistory(
+            @PathVariable Long appId,
+            HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        String markdownContent = chatHistoryService.exportChatHistoryToMarkdown(appId, loginUser);
+
+        // 设置文件名
+        String fileName = "chat-history-" + appId + ".md";
+        String encodedFileName;
+        try {
+            encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replaceAll("\\+", "%20");
+        } catch (Exception e) {
+            encodedFileName = fileName;
+        }
+
+        // 构建响应头
+        HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"");
+        headers.add(HttpHeaders.CONTENT_TYPE, "text/markdown; charset=UTF-8");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(markdownContent.getBytes(StandardCharsets.UTF_8));
+    }
 
 }
