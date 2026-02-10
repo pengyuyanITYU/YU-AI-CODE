@@ -27,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -139,24 +140,46 @@ public class AiCodeGeneratorFacade {
      */
     private Flux<String> processTokenStream(TokenStream tokenStream, Long appId) {
         return Flux.create(sink -> {
+            AtomicBoolean cancelled = new AtomicBoolean(false);
+
+            sink.onCancel(() -> {
+                cancelled.set(true);
+                log.info("用户取消了生成任务: appId={}", appId);
+            });
+
             tokenStream.onPartialResponse((String partialResponse) -> {
+                if (cancelled.get()) {
+                    throw new RuntimeException("CANCELLED_BY_USER");
+                }
                 AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
                 sink.next(JSONUtil.toJsonStr(aiResponseMessage));
                 // 操作：将这段文本封装进 AiResponseMessage 对象，转为 JSON，通过 sink.next 推送给前端。
             })
                     .onPartialThinking((PartialThinking partialThinking) -> {
+                        if (cancelled.get()) {
+                            throw new RuntimeException("CANCELLED_BY_USER");
+                        }
                         String text = partialThinking.text();
                         sink.next(JSONUtil.toJsonStr(text));
                     })
                     .beforeToolExecution((BeforeToolExecution beforeToolExecution) -> {
+                        if (cancelled.get()) {
+                            throw new RuntimeException("CANCELLED_BY_USER");
+                        }
                         BeforeToolExecuted toolRequestMessage = new BeforeToolExecuted(beforeToolExecution.request());
                         sink.next(JSONUtil.toJsonStr(toolRequestMessage));
                     })
                     .onToolExecuted((ToolExecution toolExecution) -> {
+                        if (cancelled.get()) {
+                            throw new RuntimeException("CANCELLED_BY_USER");
+                        }
                         ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
                         sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
                     })
                     .onCompleteResponse((ChatResponse response) -> {
+                        if (cancelled.get()) {
+                            return;
+                        }
                         // 执行 Vue 项目构建（同步执行，确保预览时项目已就绪）
                         String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_" + appId;
                         vueProjectBuilder.buildProject(projectPath);
@@ -164,6 +187,10 @@ public class AiCodeGeneratorFacade {
                     })
 
                     .onError((Throwable error) -> {
+                        if (cancelled.get() || "CANCELLED_BY_USER".equals(error.getMessage())) {
+                            sink.complete(); // 用户取消不视为错误
+                            return;
+                        }
                         error.printStackTrace();
                         sink.error(error); // 告诉前端：出错了
                     })

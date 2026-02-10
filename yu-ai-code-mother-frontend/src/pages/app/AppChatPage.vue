@@ -222,9 +222,19 @@
               </div>
 
               <a-button
+                  v-if="isGenerating"
+                  type="primary"
+                  danger
+                  @click="stopGeneration"
+              >
+                <template #icon>
+                  <StopOutlined />
+                </template>
+              </a-button>
+              <a-button
+                  v-else
                   type="primary"
                   @click="sendMessage"
-                  :loading="isGenerating"
                   :disabled="!isOwner"
               >
                 <template #icon>
@@ -367,7 +377,8 @@ import {
   LeftOutlined,
   RightOutlined,
   PaperClipOutlined,
-  CloseOutlined
+  CloseOutlined,
+  StopOutlined
 } from '@ant-design/icons-vue'
 
 const route = useRoute()
@@ -406,6 +417,7 @@ const fileList = ref<UploadedFile[]>([])
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const parsedUserMessageCache = new Map<string, ParsedUserMessage>()
+const abortController = ref<AbortController | null>(null)
 
 const triggerFileUpload = () => {
   fileInput.value?.click()
@@ -694,6 +706,16 @@ const sendInitialMessage = async (prompt: string, initialFiles: UploadedFile[] =
   await generateCode(prompt, initialFiles, aiMessageIndex)
 }
 
+// 停止生成
+const stopGeneration = () => {
+  if (abortController.value) {
+    abortController.value.abort()
+    abortController.value = null
+  }
+  isGenerating.value = false
+  message.info('已停止生成')
+}
+
 // 发送消息
 const sendMessage = async () => {
   if ((!userInput.value.trim() && fileList.value.length === 0) || isGenerating.value) {
@@ -765,6 +787,9 @@ const generateCode = async (userMessage: string, files: UploadedFile[], aiMessag
     const baseURL = request.defaults.baseURL || API_BASE_URL
     const url = `${baseURL}/app/chat/gen/code`
 
+    // 创建新的 AbortController
+    abortController.value = new AbortController()
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -779,6 +804,7 @@ const generateCode = async (userMessage: string, files: UploadedFile[], aiMessag
           fileType: f.fileType
         }))
       }),
+      signal: abortController.value.signal
     })
 
     if (!response.ok) {
@@ -834,6 +860,7 @@ const generateCode = async (userMessage: string, files: UploadedFile[], aiMessag
     
     // 完成后处理
     isGenerating.value = false
+    abortController.value = null
     
     // 延迟更新预览
     setTimeout(async () => {
@@ -841,9 +868,16 @@ const generateCode = async (userMessage: string, files: UploadedFile[], aiMessag
       updatePreview()
     }, 1000)
 
-  } catch (error) {
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.log('生成已取消')
+      messages.value[aiMessageIndex].loading = false
+      return
+    }
     console.error('生成代码失败：', error)
     handleError(error, aiMessageIndex)
+  } finally {
+     abortController.value = null
   }
 }
 
