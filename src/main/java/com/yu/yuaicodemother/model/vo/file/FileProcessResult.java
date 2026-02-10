@@ -19,6 +19,10 @@ public class FileProcessResult implements Serializable {
     private String fileName;
     private String url;
     private String content;
+    /**
+     * 多模态场景下，PDF 每页转图片后的 Base64 列表
+     */
+    private java.util.List<String> imageBase64s;
     private String status;
     private String errorMessage;
     private Map<String, Object> metadata;

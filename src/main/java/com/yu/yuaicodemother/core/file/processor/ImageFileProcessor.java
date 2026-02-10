@@ -22,12 +22,25 @@ public class ImageFileProcessor implements FileContentProcessor {
     private static final List<String> SUPPORTED_EXTENSIONS = Arrays.asList(
             "jpg", "jpeg", "png", "gif", "bmp", "webp"
     );
+    // 2MB = 2 * 1024 * 1024 bytes
+    private static final long MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
 
     @Override
     public FileProcessResult process(File file, String fileUrl) {
         log.info("开始处理图片文件: {}, 原始路径: {}", file.getName(), fileUrl);
 
         try {
+            // 熔断保护：文件过大直接返回 URL，不进行 Base64 编码
+            if (file.length() > MAX_FILE_SIZE_BYTES) {
+                log.warn("Image file too large ({} bytes), skipping compression: {}", file.length(), file.getName());
+                return FileProcessResult.builder()
+                        .fileType(FileTypeEnum.IMAGE.getValue())
+                        .url(fileUrl)
+                        .content(null) // Base64 为空
+                        .status(ProcessStatusEnum.SUCCESS.getValue()) // 状态为成功
+                        .build();
+            }
+
             // 1. 准备输出流
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 

@@ -1,5 +1,6 @@
 package com.yu.yuaicodemother.ai;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.yu.yuaicodemother.model.enums.FileTypeEnum;
 import com.yu.yuaicodemother.model.enums.ProcessStatusEnum;
@@ -31,6 +32,18 @@ public class MultiModalMessageBuilder {
                 continue;
             }
 
+            // 1. 优先处理图片列表 (PDF 视觉化渲染结果)
+            if (CollUtil.isNotEmpty(file.getImageBase64s())) {
+                for (String imageBase64 : file.getImageBase64s()) {
+                    if (StrUtil.isNotBlank(imageBase64)) {
+                        contents.add(ImageContent.from(imageBase64));
+                    }
+                }
+                log.info("Added {} visual pages for PDF: {}", file.getImageBase64s().size(), file.getFileName());
+                continue;
+            }
+
+            // 2. 处理单张图片 (普通图片上传)
             if (FileTypeEnum.IMAGE.getValue().equals(file.getFileType())) {
                 String imagePayload = StrUtil.isNotBlank(file.getContent()) ? file.getContent() : file.getUrl();
                 if (StrUtil.isBlank(imagePayload)) {
@@ -43,11 +56,21 @@ public class MultiModalMessageBuilder {
                 continue;
             }
 
+            // 3. 处理文本内容 (PDF 文本提取兜底，或纯文本文件)
             if (StrUtil.isNotBlank(file.getContent())) {
                 String docContext = buildDocumentContext(file);
                 contents.add(TextContent.from(docContext));
                 log.info("Added document context to multimodal message: {}, length={}",
                         file.getFileName(), file.getContent().length());
+                continue;
+            }
+
+            // 4. 处理熔断后的 URL 回退 (只有 URL，没有内容)
+            if (StrUtil.isNotBlank(file.getUrl())) {
+                String fallbackMsg = String.format("\n[System Note: File \"%s\" is too large to process visually/textually. Please access it via URL: %s]\n",
+                        file.getFileName(), file.getUrl());
+                contents.add(TextContent.from(fallbackMsg));
+                log.info("Added fallback URL message for large file: {}", file.getFileName());
             }
         }
 

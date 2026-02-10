@@ -24,7 +24,7 @@ public class RouterNode {
                 // 获取AI路由服务
                 AiCodeGenTypeRoutingService routingService = SpringContextUtil.getBean(AiCodeGenTypeRoutingService.class);
                 // 根据原始提示词进行智能路由
-                generationType = routingService.routeCodeGenType(context.getOriginalPrompt());
+                generationType = routingService.routeCodeGenType(java.util.Collections.singletonList(dev.langchain4j.data.message.TextContent.from(context.getOriginalPrompt())));
                 log.info("AI智能路由完成，选择类型: {} ({})", generationType.getType().getValue(), generationType.getType().getText());
             } catch (Exception e) {
                 log.error("AI智能路由失败，使用默认HTML类型: {}", e.getMessage());
