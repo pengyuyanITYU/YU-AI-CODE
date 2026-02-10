@@ -26,7 +26,7 @@
           <a-tooltip :title="app.visualRange ? '已设置为公开' : '已设置为私有'">
             <span class="status-dot" :class="{ 'status-dot--public': app.visualRange }"></span>
           </a-tooltip>
-          <a-tag v-if="app.genStatus !== undefined && app.genStatus !== AppGenStatusEnum.GENERATED_SUCCESS" 
+          <a-tag v-if="app.genStatus !== undefined && app.genStatus !== AppGenStatusEnum.GENERATED_SUCCESS"
                  :color="APP_GEN_STATUS_MAP[app.genStatus as AppGenStatusEnum]?.color"
                  style="margin: 0; font-size: 10px; padding: 0 4px; line-height: 1.6;">
             {{ APP_GEN_STATUS_MAP[app.genStatus as AppGenStatusEnum]?.text }}
@@ -36,7 +36,7 @@
                  style="margin: 0; font-size: 10px; padding: 0 4px; line-height: 1.6;">
             {{ APP_DEPLOY_STATUS_MAP[app.deployStatus as AppDeployStatusEnum]?.text }}
           </a-tag>
-          <a-tooltip v-if="app.featuredStatus === AppFeaturedStatusEnum.REJECTED && app.reviewMessage" 
+          <a-tooltip v-if="app.featuredStatus === AppFeaturedStatusEnum.REJECTED && app.reviewMessage"
                      :title="'拒绝原因：' + app.reviewMessage">
             <a-tag :color="APP_FEATURED_STATUS_MAP[app.featuredStatus as AppFeaturedStatusEnum]?.color"
                    style="margin: 0; font-size: 10px; padding: 0 4px; line-height: 1.6; cursor: help;">
@@ -49,61 +49,59 @@
             {{ APP_FEATURED_STATUS_MAP[app.featuredStatus as AppFeaturedStatusEnum]?.text }}
           </a-tag>
         </a-space>
-
       </div>
     </div>
-    <div class="app-info">
+    <div class="app-content">
       <div class="app-info-main">
-        <a-avatar :src="app.user?.userAvatar" :size="36" class="app-avatar">
-          {{ app.user?.userName?.charAt(0) || 'U' }}
-        </a-avatar>
-        <div class="app-meta">
-          <div class="app-title-row">
-            <h3 class="app-title" :title="app.appName">{{ app.appName || '未命名应用' }}</h3>
-            <PushpinOutlined v-if="app.userPriority && app.userPriority > 0" class="pin-icon" />
-          </div>
-          <div class="app-author-row">
-            <span class="app-author">{{ app.user?.userName || (featured ? '官方' : '未知用户') }}</span>
-            <span v-if="featured || app.featuredStatus === AppFeaturedStatusEnum.FEATURED" class="featured-badge">精选</span>
-          </div>
-        </div>
+        <h3 class="app-title">{{ app.appName }}</h3>
+        <p class="app-desc" v-if="app.appDesc">{{ app.appDesc }}</p>
       </div>
-      <div class="app-actions" v-if="!featured">
-        <a-dropdown :trigger="['click']">
-          <a-button shape="circle" size="small" class="more-btn">
-            <template #icon><MoreOutlined /></template>
-          </a-button>
-          <template #overlay>
-            <a-menu>
-              <a-menu-item key="pin" @click="handleTogglePin">
-                <template #icon>
-                  <VerticalAlignTopOutlined />
-                </template>
-                {{ app.userPriority && app.userPriority > 0 ? '取消置顶' : '置顶应用' }}
-              </a-menu-item>
-              <a-menu-item v-if="app.featuredStatus === AppFeaturedStatusEnum.NOT_APPLIED || app.featuredStatus === AppFeaturedStatusEnum.REJECTED" 
-                           key="apply" @click="handleApplyFeatured">
-                <template #icon>
-                  <StarOutlined />
-                </template>
-                申请精选
-              </a-menu-item>
-              <a-menu-divider />
-              <a-menu-item key="toggle" @click="handleToggleVisualRange">
-                <template #icon>
-                  <GlobalOutlined v-if="!app.visualRange" />
-                  <LockOutlined v-else />
-                </template>
-                {{ app.visualRange ? '设为私有' : '设为公开' }}
-              </a-menu-item>
-              <a-menu-divider />
-              <a-menu-item key="delete" @click="showDeleteConfirm" danger>
-                <template #icon><DeleteOutlined /></template>
-                删除应用
-              </a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
+      <div class="app-footer">
+        <div class="app-author-row">
+          <span class="app-author">{{ app.user?.userName || (featured ? '官方' : '未知用户') }}</span>
+          <span v-if="app.chatCount !== undefined && app.chatCount > 0" class="app-chat-count">
+            <MessageOutlined /> {{ app.chatCount }}
+          </span>
+          <span v-if="featured || app.featuredStatus === AppFeaturedStatusEnum.FEATURED" class="featured-badge">精选</span>
+        </div>
+        <div class="app-info-actions" v-if="!featured">
+          <a-dropdown placement="topRight">
+            <a-button class="more-btn" size="small" shape="circle">
+              <template #icon><MoreOutlined /></template>
+            </a-button>
+            <template #overlay>
+              <a-menu>
+                <a-menu-item key="pin" @click="handleTogglePin">
+                  <template #icon>
+                    <PushpinOutlined v-if="app.userPriority && app.userPriority > 0" />
+                    <VerticalAlignTopOutlined v-else />
+                  </template>
+                  {{ app.userPriority && app.userPriority > 0 ? '取消置顶' : '置顶应用' }}
+                </a-menu-item>
+                <a-menu-item v-if="app.featuredStatus === AppFeaturedStatusEnum.NOT_APPLIED || app.featuredStatus === AppFeaturedStatusEnum.REJECTED"
+                             key="apply" @click="handleApplyFeatured">
+                  <template #icon>
+                    <StarOutlined />
+                  </template>
+                  申请精选
+                </a-menu-item>
+                <a-menu-divider />
+                <a-menu-item key="toggle" @click="handleToggleVisualRange">
+                  <template #icon>
+                    <GlobalOutlined v-if="!app.visualRange" />
+                    <LockOutlined v-else />
+                  </template>
+                  {{ app.visualRange ? '设为私有' : '设为公开' }}
+                </a-menu-item>
+                <a-menu-divider />
+                <a-menu-item key="delete" @click="showDeleteConfirm" danger>
+                  <template #icon><DeleteOutlined /></template>
+                  删除应用
+                </a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+        </div>
       </div>
     </div>
   </div>
@@ -112,10 +110,10 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { Modal } from 'ant-design-vue'
-import { 
-  MessageOutlined, 
-  EyeOutlined, 
-  EditOutlined, 
+import {
+  MessageOutlined,
+  EyeOutlined,
+  EditOutlined,
   MoreOutlined,
   GlobalOutlined,
   LockOutlined,
@@ -197,6 +195,9 @@ const showDeleteConfirm = () => {
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(148, 163, 184, 0.15);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-card:hover {
@@ -213,6 +214,7 @@ const showDeleteConfirm = () => {
   justify-content: center;
   overflow: hidden;
   position: relative;
+  flex-shrink: 0;
 }
 
 .app-preview img {
@@ -251,92 +253,62 @@ const showDeleteConfirm = () => {
   gap: 8px;
 }
 
-.overlay-actions :deep(.ant-btn) {
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.overlay-actions :deep(.ant-btn-default) {
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-}
-
-.overlay-actions :deep(.ant-btn-default:hover) {
-  background: rgba(255, 255, 255, 0.25);
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
 .status-badge {
   position: absolute;
   top: 12px;
   right: 12px;
-  z-index: 2;
+  z-index: 10;
 }
 
 .status-dot {
-  display: block;
-  width: 10px;
-  height: 10px;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: rgba(148, 163, 184, 0.6);
-  box-shadow: 0 0 8px rgba(148, 163, 184, 0.4);
-  transition: all 0.3s ease;
+  background: #94a3b8;
+  box-shadow: 0 0 8px rgba(148, 163, 184, 0.5);
 }
 
 .status-dot--public {
-  background: #22c55e;
-  box-shadow: 0 0 12px rgba(34, 197, 94, 0.5);
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
 }
 
-.app-info {
+.app-content {
   padding: 16px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 12px;
+  flex: 1;
 }
 
 .app-info-main {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   flex: 1;
-  min-width: 0;
-}
-
-.app-avatar {
-  flex-shrink: 0;
-  border: 2px solid rgba(148, 163, 184, 0.2);
-}
-
-.app-meta {
-  flex: 1;
-  min-width: 0;
-}
-
-.app-title-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-
-.pin-icon {
-  color: #3b82f6;
-  font-size: 14px;
-  transform: rotate(45deg);
 }
 
 .app-title {
-  font-size: 15px;
-  font-weight: 600;
   margin: 0;
-  color: rgba(255, 255, 255, 0.98);
-  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.4;
+}
+
+.app-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: rgba(148, 163, 184, 0.7);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
+}
+
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
 }
 
 .app-author-row {
@@ -350,6 +322,14 @@ const showDeleteConfirm = () => {
   color: rgba(148, 163, 184, 0.8);
 }
 
+.app-chat-count {
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .featured-badge {
   font-size: 10px;
   padding: 2px 6px;
@@ -359,8 +339,9 @@ const showDeleteConfirm = () => {
   font-weight: 600;
 }
 
-.app-actions {
-  flex-shrink: 0;
+.app-info-actions {
+  display: flex;
+  align-items: center;
 }
 
 .more-btn {

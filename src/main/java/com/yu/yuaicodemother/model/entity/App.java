@@ -142,8 +142,15 @@ public class App implements Serializable {
     private String reviewMessage;
 
     /**
+     * 对话轮次
+     */
+    @Column("chat_count")
+    private Integer chatCount;
+
+    /**
      * 是否删除
      */
+
 
     @Column(value = "isDelete", isLogicDelete = true)
     private Integer isDelete;

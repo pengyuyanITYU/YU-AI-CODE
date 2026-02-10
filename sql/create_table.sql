@@ -99,3 +99,7 @@ ALTER TABLE app ADD COLUMN featured_status INT DEFAULT 0 COMMENT '精选状态�
 ALTER TABLE app ADD COLUMN user_priority INT DEFAULT 0 COMMENT '用户个人优先级';
 CREATE INDEX idx_featured_status ON app(featured_status);
 CREATE INDEX idx_user_priority ON app(user_priority);
+
+-- 2026-02-10: 统计应用对话轮次
+ALTER TABLE app ADD COLUMN chat_count INT DEFAULT 0 COMMENT '对话轮次';
+

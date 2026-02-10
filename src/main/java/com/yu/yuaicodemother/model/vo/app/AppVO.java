@@ -100,7 +100,13 @@ public class AppVO implements Serializable {
      */
     private String reviewMessage;
 
+    /**
+     * 对话轮次
+     */
+    private Integer chatCount;
+
     @Serial
+
 
     private static final long serialVersionUID = 1L;
 }

@@ -1,14 +1,20 @@
 package com.yu.yuaicodemother.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+
+
+
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import com.mybatisflex.core.update.UpdateChain;
 import com.yu.yuaicodemother.ai.AiCodeGenTypeRoutingService;
+
 import com.yu.yuaicodemother.ai.AiCodeGenerateAppNameService;
+
 import com.yu.yuaicodemother.ai.MultiModalMessageBuilder;
 import com.yu.yuaicodemother.ai.model.CodeGenTypeRoutingResult;
 import com.yu.yuaicodemother.constant.AppConstant;
@@ -195,19 +201,22 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         
         // 8. 调用 AI 生成代码（流式）
         Flux<String> contentFlux = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, processedFiles, codeGenTypeEnum, appId);
-        
+
         // 9. 收集AI响应内容并在完成后记录到对话历史
         Flux<String> result = streamHandlerExecutor
                 .doExecute(contentFlux, chatHistoryService, appId, loginUser, codeGenTypeEnum)
                 .doOnComplete(() -> {
                     // 流正常完成，更新状态为生成成功
                     updateGenStatus(appId, AppGenStatusEnum.GENERATED_SUCCESS.getValue());
+                    // 增加对话轮次
+                    UpdateChain.of(App.class).setRaw("chat_count", "chat_count + 1").where(App::getId).eq(appId).update();
                 })
                 .doOnError(error -> {
                     // 流发生错误，更新状态为生成失败
                     log.error("应用生成失败: {}", error.getMessage());
                     updateGenStatus(appId, AppGenStatusEnum.GENERATED_FAILED.getValue());
                 })
+
                 .doFinally(signalType ->
                 // 流结束后清理 无论成功/失败/取消
                 MonitorContextHolder.clearContext());

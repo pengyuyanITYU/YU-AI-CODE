@@ -50,7 +50,6 @@ declare namespace API {
   }
 
   type AppVO = {
-
     id?: number
     appName?: string
     cover?: string
@@ -63,7 +62,7 @@ declare namespace API {
     userPriority?: number
     reviewMessage?: string
     userId?: number
-
+    chatCount?: number
     currentVersion?: number
     deployStatus?: number
     genStatus?: number
@@ -72,6 +71,7 @@ declare namespace API {
     user?: UserVO
     visualRange: boolean
   }
+
 
   type AppDeployControlRequest = {
     appId?: number
