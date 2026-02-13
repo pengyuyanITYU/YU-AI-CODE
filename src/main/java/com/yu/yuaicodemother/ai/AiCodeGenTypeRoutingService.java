@@ -3,7 +3,7 @@ package com.yu.yuaicodemother.ai;
 import com.yu.yuaicodemother.ai.model.CodeGenTypeRoutingResult;
 import dev.langchain4j.data.message.Content;
 import dev.langchain4j.service.SystemMessage;
-
+import dev.langchain4j.service.UserMessage;
 import java.util.List;
 
 /**
@@ -17,9 +17,9 @@ public interface AiCodeGenTypeRoutingService {
     /**
      * 根据用户需求智能选择代码生成类型
      *
-     * @param userMessage 用户提示词（多模态）
+     * @param contents 用户提示词（多模态）
      * @return 推荐的代码生成类型
      */
     @SystemMessage(fromResource = "prompt/codegen-routing-system-prompt.txt")
-    CodeGenTypeRoutingResult routeCodeGenType(@dev.langchain4j.service.UserMessage List<Content> contents);
+    CodeGenTypeRoutingResult routeCodeGenType(@UserMessage List<Content> contents);
 }

@@ -20,6 +20,8 @@
     "axios": "^1.11.0",
     "docx": "^9.5.1",
     "highlight.js": "^11.11.1",
+    "js-tiktoken": "^1.0.21",
+    "lucide-vue-next": "^0.563.0",
     "markdown-it": "^14.1.0",
     "pinia": "^3.0.3",
     "vue": "^3.5.17",

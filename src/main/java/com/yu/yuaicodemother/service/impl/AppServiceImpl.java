@@ -556,4 +556,21 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         app.setReviewMessage(reviewMessage);
         return this.updateById(app);
     }
+
+    @Override
+    public void incrementTokenUsage(Long appId, long inputTokens, long outputTokens, long totalTokens) {
+        if (appId == null || appId <= 0) {
+            return;
+        }
+        try {
+            UpdateChain.of(App.class)
+                    .setRaw("total_input_tokens", "total_input_tokens + " + inputTokens)
+                    .setRaw("total_output_tokens", "total_output_tokens + " + outputTokens)
+                    .setRaw("total_tokens", "total_tokens + " + totalTokens)
+                    .where(App::getId).eq(appId)
+                    .update();
+        } catch (Exception e) {
+            log.error("更新应用Token消耗失败, appId: {}, error: {}", appId, e.getMessage());
+        }
+    }
 }

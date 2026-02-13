@@ -148,6 +148,24 @@ public class App implements Serializable {
     private Integer chatCount;
 
     /**
+     * 累计输入Token数
+     */
+    @Column("total_input_tokens")
+    private Long totalInputTokens;
+
+    /**
+     * 累计输出Token数
+     */
+    @Column("total_output_tokens")
+    private Long totalOutputTokens;
+
+    /**
+     * 累计总Token数
+     */
+    @Column("total_tokens")
+    private Long totalTokens;
+
+    /**
      * 是否删除
      */
 

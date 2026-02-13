@@ -8,6 +8,7 @@ import AppReviewPage from '@/pages/admin/AppReviewPage.vue'
 import AppChatPage from '@/pages/app/AppChatPage.vue'
 import AppEditPage from '@/pages/app/AppEditPage.vue'
 import ChatManagePage from "@/pages/admin/ChatManagePage.vue";
+import AdminLayout from '@/layouts/AdminLayout.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,25 +30,38 @@ const router = createRouter({
       component: UserRegisterPage,
       meta: { title: '用户注册', hideLayout: true }
     },
+    // 管理端路由 - 使用 AdminLayout 布局
     {
-      path: '/admin/userManage',
-      name: '用户管理',
-      component: UserManagePage,
-    },
-    {
-      path: '/admin/appManage',
-      name: '应用管理',
-      component: AppManagePage,
-    },
-    {
-      path: '/admin/appReview',
-      name: '申请审核',
-      component: AppReviewPage,
-    },
-    {
-      path: '/admin/chatManage',
-      name: '对话管理',
-      component: ChatManagePage,
+      path: '/admin',
+      component: AdminLayout,
+      meta: { requiresAdmin: true },
+      children: [
+        {
+          path: '',
+          name: '管理首页',
+          component: HomePage,
+        },
+        {
+          path: 'userManage',
+          name: '用户管理',
+          component: UserManagePage,
+        },
+        {
+          path: 'appManage',
+          name: '应用管理',
+          component: AppManagePage,
+        },
+        {
+          path: 'appReview',
+          name: '申请审核',
+          component: AppReviewPage,
+        },
+        {
+          path: 'chatManage',
+          name: '对话管理',
+          component: ChatManagePage,
+        },
+      ],
     },
     {
       path: '/app/chat/:id',

@@ -26,6 +26,16 @@ public class AppChatFile implements Serializable {
      */
     private String fileType;
 
+    /**
+     * 图片宽度（仅图片类型有效，单位：像素）
+     */
+    private Integer width;
+
+    /**
+     * 图片高度（仅图片类型有效，单位：像素）
+     */
+    private Integer height;
+
     @Serial
     private static final long serialVersionUID = 1L;
 }

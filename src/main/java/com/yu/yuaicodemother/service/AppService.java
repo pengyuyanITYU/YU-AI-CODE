@@ -88,5 +88,15 @@ public interface AppService extends IService<App> {
      * @return
      */
     boolean reviewApp(AppReviewRequest appReviewRequest);
+
+    /**
+     * 累加应用 Token 消耗
+     *
+     * @param appId         应用ID
+     * @param inputTokens   输入Token数
+     * @param outputTokens  输出Token数
+     * @param totalTokens   总Token数
+     */
+    void incrementTokenUsage(Long appId, long inputTokens, long outputTokens, long totalTokens);
 }
 

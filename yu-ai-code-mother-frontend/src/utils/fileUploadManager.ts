@@ -19,6 +19,8 @@ export interface UploadedFile {
   status: 'uploading' | 'processing' | 'success' | 'failed'
   errorMessage?: string
   metadata?: UploadedFileMetadata
+  width?: number      // 图片宽度（仅图片类型有效）
+  height?: number     // 图片高度（仅图片类型有效）
 }
 
 export interface FileAttachmentPayload {
@@ -36,6 +38,36 @@ const ALLOWED_EXTENSIONS = [
 ]
 
 const INIT_FILES_STORAGE_PREFIX = 'app_chat_init_files_'
+
+/**
+ * 获取图片尺寸
+ * @param file - 文件对象
+ * @returns 图片宽高，非图片类型返回 null，获取失败返回 null
+ */
+export async function getImageDimensions(
+  file: File
+): Promise<{ width: number; height: number } | null> {
+  if (!file.type.startsWith('image/')) {
+    return null
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    }
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      resolve(null)
+    }
+
+    img.src = url
+  })
+}
 
 export async function uploadAndProcessFile(file: File): Promise<UploadedFile | null> {
   const ext = file.name.split('.').pop()?.toLowerCase()

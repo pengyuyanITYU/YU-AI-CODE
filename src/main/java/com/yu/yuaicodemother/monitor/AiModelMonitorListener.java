@@ -1,5 +1,6 @@
 package com.yu.yuaicodemother.monitor;
 
+import com.yu.yuaicodemother.service.AppService;
 import dev.langchain4j.model.chat.listener.ChatModelErrorContext;
 import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
@@ -7,6 +8,7 @@ import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
 import dev.langchain4j.model.output.TokenUsage;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -33,6 +35,11 @@ public class AiModelMonitorListener implements ChatModelListener {
 
     @Resource
     private AiModelMetricsCollector aiModelMetricsCollector;
+
+    @Lazy
+    @Resource
+    private AppService appService;
+
     /**
      * 属性键：请求开始时间
      * 用于在 attributes Map 中存储 Instant 对象，以便在响应/错误时计算耗时。
@@ -188,15 +195,26 @@ public class AiModelMonitorListener implements ChatModelListener {
         TokenUsage tokenUsage = responseContext.chatResponse().metadata().tokenUsage();
 
         if (tokenUsage != null) {
-            // 记录 Prompt (输入) Token
-            aiModelMetricsCollector.recordTokenUsage(userId, appId, modelName, "input", tokenUsage.inputTokenCount());
+            long inputTokens = tokenUsage.inputTokenCount();
+            long outputTokens = tokenUsage.outputTokenCount();
+            long totalTokens = tokenUsage.totalTokenCount();
 
+            // 记录 Prompt (输入) Token
+            aiModelMetricsCollector.recordTokenUsage(userId, appId, modelName, "input", inputTokens);
 
             // 记录 Completion (输出) Token
-            aiModelMetricsCollector.recordTokenUsage(userId, appId, modelName, "output", tokenUsage.outputTokenCount());
+            aiModelMetricsCollector.recordTokenUsage(userId, appId, modelName, "output", outputTokens);
 
             // 记录 Total Token
-            aiModelMetricsCollector.recordTokenUsage(userId, appId, modelName, "total", tokenUsage.totalTokenCount());
+            aiModelMetricsCollector.recordTokenUsage(userId, appId, modelName, "total", totalTokens);
+
+            // 持久化到数据库
+            try {
+                Long appIdLong = Long.valueOf(appId);
+                appService.incrementTokenUsage(appIdLong, inputTokens, outputTokens, totalTokens);
+            } catch (NumberFormatException e) {
+                log.warn("Invalid appId format: {}", appId);
+            }
         }
     }
 }

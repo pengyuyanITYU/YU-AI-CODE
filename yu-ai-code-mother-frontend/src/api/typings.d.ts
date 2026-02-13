@@ -63,6 +63,9 @@ declare namespace API {
     reviewMessage?: string
     userId?: number
     chatCount?: number
+    totalInputTokens?: number
+    totalOutputTokens?: number
+    totalTokens?: number
     currentVersion?: number
     deployStatus?: number
     genStatus?: number

@@ -182,8 +182,11 @@ const handleSubmit = async (values: any) => {
     if (res.data.code === 0 && res.data.data) {
       await loginUserStore.fetchLoginUser()
       message.success('登录成功，欢迎回来！')
+      // 根据角色跳转不同页面：管理员跳转到管理后台，普通用户跳转到首页
+      const userRole = loginUserStore.loginUser.userRole
+      const redirectPath = userRole === 'admin' ? '/admin' : '/'
       router.push({
-        path: '/',
+        path: redirectPath,
         replace: true,
       })
     } else {

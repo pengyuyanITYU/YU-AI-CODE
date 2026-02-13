@@ -7,6 +7,12 @@
         <a-tag v-if="appInfo?.codeGenType" color="blue" class="code-gen-type-tag">
           {{ formatCodeGenType(appInfo.codeGenType) }}
         </a-tag>
+        <a-tooltip :title="tokenTooltipText" placement="bottom">
+          <div class="token-stats">
+            <span class="token-icon">⁋</span>
+            <span class="token-count">{{ formatTokenCount(displayedTokens) }} tokens</span>
+          </div>
+        </a-tooltip>
       </div>
       <div class="header-right">
         <a-tooltip title="应用详情">
@@ -45,11 +51,11 @@
 
         <!-- 部署控制：如果是 ONLINE，显示下线；否则显示部署 -->
         <template v-if="isOwner">
-            <a-button 
+            <a-button
                 v-if="appInfo?.deployStatus === AppDeployStatusEnum.ONLINE"
-                type="primary" 
+                type="primary"
                 danger
-                @click="handleToggleDeploy(AppDeployStatusEnum.OFFLINE)" 
+                @click="handleToggleDeploy(AppDeployStatusEnum.OFFLINE)"
                 :loading="deploying"
             >
               <template #icon>
@@ -57,10 +63,10 @@
               </template>
               下线
             </a-button>
-            <a-button 
+            <a-button
                 v-else
-                type="primary" 
-                @click="handleToggleDeploy(AppDeployStatusEnum.ONLINE)" 
+                type="primary"
+                @click="handleToggleDeploy(AppDeployStatusEnum.ONLINE)"
                 :loading="deploying"
             >
               <template #icon>
@@ -216,8 +222,8 @@
                   accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.txt,.md,.html,.css,.vue"
                 />
                 <a-tooltip title="上传参考文件">
-                  <a-button 
-                    type="text" 
+                  <a-button
+                    type="text"
                     class="action-btn"
                     :loading="uploading"
                     @click="triggerFileUpload"
@@ -361,7 +367,14 @@ import { listVersions, rollbackVersion } from '@/api/appVersionController'
 import { listAppChatHistory } from '@/api/chatHistoryController'
 import { CodeGenTypeEnum, formatCodeGenType } from '@/utils/codeGenTypes'
 import { AppDeployStatusEnum } from '@/utils/appStatus'
-import { uploadAndProcessFile, type UploadedFile, getFileIcon, consumeInitialFilesFromSession } from '@/utils/fileUploadManager'
+import { uploadAndProcessFile, type UploadedFile, getFileIcon, consumeInitialFilesFromSession, getImageDimensions } from '@/utils/fileUploadManager'
+import {
+  calculateInputTokens,
+  formatTokenCount,
+  getTokenTooltipText,
+  type TokenBreakdown,
+  type AccumulatedTokens
+} from '@/utils/tokenEstimator'
 import request from '@/request'
 
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
@@ -427,6 +440,57 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const parsedUserMessageCache = new Map<string, ParsedUserMessage>()
 const abortController = ref<AbortController | null>(null)
 
+// Token 计算相关
+const tokenBreakdown = computed<TokenBreakdown>(() => {
+  return calculateInputTokens(userInput.value, fileList.value)
+})
+
+const accumulatedTokens = computed<AccumulatedTokens>(() => {
+  return {
+    totalInputTokens: appInfo.value?.totalInputTokens || 0,
+    totalOutputTokens: appInfo.value?.totalOutputTokens || 0,
+    totalTokens: appInfo.value?.totalTokens || 0
+  }
+})
+
+// 判断是否已有对话历史（有任何消息即算有历史）
+const hasConversationHistory = computed(() => {
+  // 只要有消息（哪怕是用户发了但AI没回），就不算第一次提问
+  return messages.value.length > 0
+})
+
+// 显示的token数：
+// - 第一次提问（无历史）：0
+// - 有历史且在输入中：累计tokens + 当前输入tokens
+// - AI生成完成后：总消耗的tokens
+const displayedTokens = computed(() => {
+  const totalConsumed = appInfo.value?.totalTokens || 0
+
+  // 如果已经有对话历史，说明不是第一次提问
+  if (hasConversationHistory.value) {
+    // 如果正在生成中，显示当前累计值；否则显示已完成的总消耗
+    if (isGenerating.value) {
+      // 生成中：显示之前累计的 + 当前输入的（但还没收到AI回复，所以不预估输出）
+      return totalConsumed + tokenBreakdown.value.currentInputTotal
+    } else {
+      // 生成完成：显示总消耗的tokens
+      return totalConsumed
+    }
+  } else {
+    // 第一次提问，没有历史记录
+    // 如果用户已经开始输入（有文字或文件），显示当前输入的tokens
+    // 否则显示 0
+    if (userInput.value.trim() || fileList.value.length > 0) {
+      return tokenBreakdown.value.currentInputTotal
+    }
+    return 0
+  }
+})
+
+const tokenTooltipText = computed(() => {
+  return getTokenTooltipText(tokenBreakdown.value, accumulatedTokens.value)
+})
+
 const triggerFileUpload = () => {
   fileInput.value?.click()
 }
@@ -445,10 +509,25 @@ const handleFileUpload = async (event: Event) => {
     return
   }
 
+  // 如果是图片，先获取尺寸
+  let imageDimensions: { width: number; height: number } | null = null
+  if (file.type.startsWith('image/')) {
+    imageDimensions = await getImageDimensions(file)
+    if (!imageDimensions) {
+      message.error('该文件已损坏，请上传完整图片')
+      return
+    }
+  }
+
   uploading.value = true
   try {
     const uploadedFile = await uploadAndProcessFile(file)
     if (uploadedFile) {
+      // 如果是图片，添加尺寸信息
+      if (imageDimensions) {
+        uploadedFile.width = imageDimensions.width
+        uploadedFile.height = imageDimensions.height
+      }
       fileList.value.push(uploadedFile)
       message.success(`文件 ${file.name} 上传成功`)
     }
@@ -746,10 +825,10 @@ const sendMessage = async () => {
     }
     message += elementContext
   }
-  
+
   // 保存当前要发送的文件列表副本
   const currentFiles = [...fileList.value]
-  
+
   userInput.value = ''
   fileList.value = [] // 清空文件列表
 
@@ -841,7 +920,7 @@ const generateCode = async (userMessage: string, files: UploadedFile[], aiMessag
         if (line.startsWith('data:')) {
           const data = line.slice(5).trim()
           if (!data) continue
-          
+
           if (data === '[DONE]') {
             // Stream finished
             continue
@@ -849,12 +928,12 @@ const generateCode = async (userMessage: string, files: UploadedFile[], aiMessag
 
           try {
             const parsed = JSON.parse(data)
-            
+
             // 处理 done 事件
             if (parsed.event === 'done') {
                continue
             }
-            
+
             const content = parsed.d
             if (content !== undefined && content !== null) {
               fullContent += content
@@ -868,11 +947,11 @@ const generateCode = async (userMessage: string, files: UploadedFile[], aiMessag
         }
       }
     }
-    
+
     // 完成后处理
     isGenerating.value = false
     abortController.value = null
-    
+
     // 延迟更新预览
     setTimeout(async () => {
       await fetchAppInfo()
@@ -1270,6 +1349,33 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.token-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  transition: all 0.2s ease;
+}
+
+.token-stats:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.token-icon {
+  font-size: 14px;
+}
+
+.token-count {
+  font-weight: 500;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
 }
 
 .code-gen-type-tag {

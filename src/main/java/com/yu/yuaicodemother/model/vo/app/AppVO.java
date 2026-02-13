@@ -105,8 +105,21 @@ public class AppVO implements Serializable {
      */
     private Integer chatCount;
 
+    /**
+     * 累计输入Token数
+     */
+    private Long totalInputTokens;
+
+    /**
+     * 累计输出Token数
+     */
+    private Long totalOutputTokens;
+
+    /**
+     * 累计总Token数
+     */
+    private Long totalTokens;
+
     @Serial
-
-
     private static final long serialVersionUID = 1L;
 }

@@ -92,7 +92,7 @@ import { useRouter } from 'vue-router'
 import { type MenuProps, message } from 'ant-design-vue'
 import { useLoginUserStore } from '@/stores/loginUser'
 import { userLogout } from '@/api/userController'
-import { LogoutOutlined, HomeOutlined, AppstoreOutlined, UserOutlined } from '@ant-design/icons-vue'
+import { LogoutOutlined, HomeOutlined } from '@ant-design/icons-vue'
 
 const loginUserStore = useLoginUserStore()
 const router = useRouter()
@@ -109,48 +109,12 @@ const originItems = [
     label: '主页',
     title: '主页',
   },
-  {
-    key: '/admin/userManage',
-    icon: () => h(UserOutlined),
-    label: '用户管理',
-    title: '用户管理',
-  },
-  {
-    key: '/admin/appManage_parent',
-    icon: () => h(AppstoreOutlined),
-    label: '应用管理',
-    title: '应用管理',
-    children: [
-      {
-        key: '/admin/appManage',
-        label: '应用列表',
-        title: '应用列表',
-      },
-      {
-        key: '/admin/appReview',
-        label: '用户申请',
-        title: '用户申请',
-      },
-    ],
-  },
 ]
 
+// 菜单过滤函数（保留用于未来扩展）
 const filterMenus = (menus = [] as MenuProps['items']) => {
   return menus?.filter((menu) => {
     if (!menu) return false
-    const menuKey = menu.key as string
-    // 如果是子菜单
-    if ('children' in menu && menu.children) {
-      menu.children = filterMenus(menu.children as MenuProps['items'])
-      return menu.children && menu.children.length > 0
-    }
-    // 普通菜单权限检查
-    if (menuKey?.startsWith('/admin')) {
-      const loginUser = loginUserStore.loginUser
-      if (!loginUser || loginUser.userRole !== 'admin') {
-        return false
-      }
-    }
     return true
   })
 }
