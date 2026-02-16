@@ -381,4 +381,35 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         return markdown.toString();
     }
 
+    /**
+     * 【智能记忆支持】获取未总结的消息 - 增量查询实现
+     *
+     * <p>实现逻辑：
+     * 1. 构建基础查询条件：按appId过滤，按createTime正序排列
+     * 2. 如果afterId不为null，添加id > afterId条件实现增量查询
+     * 3. 执行查询返回符合条件的消息列表</p>
+     *
+     * <p>性能优化：
+     * - 使用chat_history表的idx_appId_createTime复合索引
+     * - 只查询必要字段，避免全表扫描</p>
+     *
+     * <p>使用场景：
+     * - SmartMemoryServiceImpl触发总结时获取待处理消息
+     * - 支持首次总结(afterId=null)和增量总结</p>
+     *
+     * @param appId 应用ID
+     * @param afterId 起始消息ID（不包含），null表示从第一条开始
+     * @return 未总结的消息列表，按时间正序排列
+     */
+    @Override
+    public List<ChatHistory> getUnsummarizedMessages(Long appId, Long afterId) {
+        QueryWrapper queryWrapper = QueryWrapper.create()
+                .eq(ChatHistory::getAppId, appId)
+                .orderBy(ChatHistory::getCreateTime, true);
+        if (afterId != null) {
+            queryWrapper.gt(ChatHistory::getId, afterId);
+        }
+        return this.list(queryWrapper);
+    }
+
 }

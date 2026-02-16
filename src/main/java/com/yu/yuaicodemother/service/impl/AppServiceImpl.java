@@ -90,6 +90,15 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private AiCodeGenerateAppNameService aiCodeGenerateAppNameService;
 
+    /**
+     * 【智能记忆触发点】智能记忆服务
+     * 在对话流正常完成后(doOnComplete)异步触发记忆总结
+     * 实现对话历史的自动压缩，解决长对话Token超限问题
+     * @see com.yu.yuaicodemother.service.SmartMemoryService#triggerSummaryIfNeeded
+     */
+    @Resource
+    private SmartMemoryService smartMemoryService;
+
     @Override
     public Long createApp(AppAddRequest appAddRequest, User loginUser) {
         // 参数校验
@@ -210,6 +219,11 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
                     updateGenStatus(appId, AppGenStatusEnum.GENERATED_SUCCESS.getValue());
                     // 增加对话轮次
                     UpdateChain.of(App.class).setRaw("chat_count", "chat_count + 1").where(App::getId).eq(appId).update();
+                    // 【智能记忆触发点】异步触发记忆总结
+                    // 说明：对话完成后自动触发，使用@Async异步执行，不阻塞用户响应
+                    // 逻辑：检查是否达到阈值 → 启发式分类复杂度 → 生成SHORT摘要 → 尝试合并MID/LONG
+                    // 异常：内部捕获异常，不影响主流程，失败会在日志中记录
+                    smartMemoryService.triggerSummaryIfNeeded(appId, loginUser.getId());
                 })
                 .doOnError(error -> {
                     // 流发生错误，更新状态为生成失败

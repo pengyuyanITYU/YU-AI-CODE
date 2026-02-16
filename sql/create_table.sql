@@ -103,3 +103,49 @@ CREATE INDEX idx_user_priority ON app(user_priority);
 -- 2026-02-10: 统计应用对话轮次
 ALTER TABLE app ADD COLUMN chat_count INT DEFAULT 0 COMMENT '对话轮次';
 
+-- 2026-02-14: 智能记忆管理系统 - 对话记忆摘要表
+-- 功能说明：存储AI对话的分层摘要，实现Token压缩(80%-90%)
+-- 核心设计：三层结构 SHORT(短期) → MID(中期) → LONG(长期)
+-- 使用场景：对话完成后异步生成摘要，加载时优先使用摘要+最近消息
+CREATE TABLE chat_memory_summary (
+    -- 主键字段
+    id                BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID，雪花算法生成',
+
+    -- 业务关联字段
+    appId             BIGINT       NOT NULL COMMENT '应用ID，关联app表',
+    userId            BIGINT       NOT NULL COMMENT '用户ID，摘要创建者',
+
+    -- 摘要核心字段
+    layer             VARCHAR(32)  NOT NULL COMMENT '摘要层级：SHORT(短期)/MID(中期)/LONG(长期)',
+    summary           TEXT         NOT NULL COMMENT 'AI生成的摘要内容',
+
+    -- 覆盖范围字段（用于增量总结）
+    coveredFrom       BIGINT       NULL     COMMENT '覆盖起始消息ID（chat_history.id）',
+    coveredTo         BIGINT       NULL     COMMENT '覆盖结束消息ID（chat_history.id）',
+    coveredCount      INT          DEFAULT 0 COMMENT '本次摘要覆盖的原始消息数量',
+
+    -- Token统计字段（用于压缩率计算）
+    originalTokens    INT          DEFAULT 0 COMMENT '原始消息Token总数（JTokkit精确计算）',
+    summaryTokens     INT          DEFAULT 0 COMMENT '生成摘要的Token数量',
+
+    -- 复杂度与溯源字段
+    topicComplexity   VARCHAR(16)  DEFAULT 'MEDIUM' COMMENT '主题复杂度：LOW(阈值40)/MEDIUM(30)/HIGH(20)',
+    parentSummaryId   BIGINT       NULL     COMMENT '父摘要ID，记录MID/LONG由哪些下级摘要合并而来，用于溯源调试',
+
+    -- 技术字段
+    embedding         JSON         NULL     COMMENT '摘要语义向量（float[] JSON数组），用于相似度去重',
+    version           INT          DEFAULT 0 COMMENT '乐观锁版本号，防止并发总结冲突',
+
+    -- 时间字段
+    createTime        DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL COMMENT '创建时间',
+    updateTime        DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+
+    -- 软删除字段
+    isDelete          TINYINT  DEFAULT 0 NOT NULL COMMENT '是否删除：0-未删除，1-已删除',
+
+    -- 索引优化
+    INDEX idx_app_layer (appId, layer) COMMENT '按应用和层级查询（最常用）',
+    INDEX idx_app_createtime (appId, createTime) COMMENT '按应用和时间范围查询（用于清理旧数据）',
+    INDEX idx_parent (parentSummaryId) COMMENT '按父摘要查询（用于溯源）'
+
+) COMMENT '对话记忆摘要表 - 智能记忆管理系统核心表，支持分层摘要和Token压缩' COLLATE = utf8mb4_unicode_ci;

@@ -212,8 +212,8 @@ const doLogout = async () => {
   z-index: -9999 !important;
 }
 
-/* 响应式适配 */
-@media (max-width: 768px) {
+/* 响应式适配 - 只在超小屏幕（手机）隐藏侧边栏 */
+@media (max-width: 480px) {
   .admin-main-layout {
     margin-left: 0;
   }
