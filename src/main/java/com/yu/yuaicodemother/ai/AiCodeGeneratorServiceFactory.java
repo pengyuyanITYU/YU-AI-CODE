@@ -90,18 +90,29 @@ public class AiCodeGeneratorServiceFactory {
      * 创建新的 AI 服务实例
      */
     private AiCodeGeneratorService createAiCodeGeneratorService(long appId, CodeGenTypeEnum codeGenType) {
+        /*
+        * 这里选择redis作为内存数据库,是因为
+        * 1.读写对话记忆性能更高
+        * 2.数据库中的对话历史表中包含其他业务字段,
+        * 不适合直接交给LangChain4j的对话记忆组件进行管理
+        * */
         MessageWindowChatMemory chatMemory = MessageWindowChatMemory
                 .builder()
                 .id(appId)
                 .chatMemoryStore(redisChatMemoryStore)
                 .maxMessages(100)
                 .build();
+
         // 【智能记忆集成点】
         // 根据配置决定对话历史加载方式：
         // - 启用智能记忆：使用分层摘要 + 最近原始消息(更省Token，保留关键信息)
         // - 禁用智能记忆：回退到传统方式(加载最近20条原始消息)
-//        TODO 检查这里删干净没有
-
+//        TODO 错误的逻辑
+        if (smartMemoryProperties.isEnabled()) {
+            smartMemoryService.loadSmartMemory(appId, chatMemory);
+        } else {
+            chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
+        }
         // 根据代码生成类型选择不同的模型配置
         return switch (codeGenType) {
             // Vue 项目生成使用推理模型
@@ -111,7 +122,7 @@ public class AiCodeGeneratorServiceFactory {
                     .tools(toolManager.getAllTools())
                     .inputGuardrails(new PromptSafetyInputGuardrail())
                     .maxSequentialToolsInvocations(20) // 最多连续调用20次工具 TODO 具体为多少得根据不同模型进行测试
-                    // .outputGuardrails(new RetryOutputGuardrail()) 可能会导致流式输出的响应不及时
+                    // .outputGuardrails(new RetryOutputGuardrail())  TODO 可以选则输出导轨,但是可能会导致流式输出的响应不及时
                     .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                             toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()))
                     .build();
